@@ -5,7 +5,32 @@ $router->get('/ingredients', function() {
   require_login();
   global $pdo;
 
-  $rows = $pdo->query("SELECT * FROM v_ingredients_snapshot ORDER BY name")->fetchAll();
+  $perPage = 50;
+  $page = max(1, (int)($_GET['page'] ?? 1));
+
+  $total = (int)$pdo->query("SELECT COUNT(*) FROM v_ingredients_snapshot")->fetchColumn();
+
+  if ($total === 0) {
+    $totalPages = 1;
+    $page = 1;
+  } else {
+    $totalPages = (int)ceil($total / $perPage);
+    if ($page > $totalPages) { $page = $totalPages; }
+  }
+
+  $offset = ($page - 1) * $perPage;
+
+  $stmt = $pdo->query("SELECT * FROM v_ingredients_snapshot ORDER BY name LIMIT {$perPage} OFFSET {$offset}");
+  $rows = $stmt->fetchAll();
+
+  $navLinks = [];
+  if ($page > 1) {
+    $navLinks[] = "<a href='".url_for("/ingredients?page=".($page - 1))."'>Prev</a>";
+  }
+  if ($page < $totalPages) {
+    $navLinks[] = "<a href='".url_for("/ingredients?page=".($page + 1))."'>Next</a>";
+  }
+  $nav = $navLinks ? "<p class='pager'>".implode(' | ', $navLinks)."</p>" : '';
 
   $list = "<table><tr><th>Name</th><th>Unit</th><th>On hand</th><th>WAC (BWP/u)</th><th>Reorder</th>";
   if (role_is('admin')) { $list .= "<th>Actions</th>"; }
@@ -47,7 +72,7 @@ $router->get('/ingredients', function() {
       </form>";
   }
 
-  render('Ingredients', "<h1>Ingredients</h1>{$list}{$form}");
+  render('Ingredients', "<h1>Ingredients</h1>{$nav}{$list}{$nav}{$form}");
 });
 
 $router->get('/ingredients/edit', function() {

@@ -7,6 +7,26 @@ $router->get('/batches', function () {
   require_login();
   global $pdo;
 
+  $perPage = 50;
+  $page = max(1, (int)($_GET['page'] ?? 1));
+
+  $total = (int)$pdo->query("
+    SELECT COUNT(*)
+    FROM batches b
+    JOIN recipe_versions rv ON rv.id = b.recipe_version_id
+    JOIN recipes r          ON r.id = rv.recipe_id
+  ")->fetchColumn();
+
+  if ($total === 0) {
+    $totalPages = 1;
+    $page = 1;
+  } else {
+    $totalPages = (int)ceil($total / $perPage);
+    if ($page > $totalPages) { $page = $totalPages; }
+  }
+
+  $offset = ($page - 1) * $perPage;
+
   $rows = $pdo->query("
     SELECT b.id, b.batch_date, b.churn_start_dt, b.target_mix_g, b.actual_mix_g, b.cogs_bwp,
            r.name AS recipe_name, rv.version_no
@@ -14,8 +34,17 @@ $router->get('/batches', function () {
     JOIN recipe_versions rv ON rv.id = b.recipe_version_id
     JOIN recipes r          ON r.id = rv.recipe_id
     ORDER BY b.batch_date DESC, b.id DESC
-    LIMIT 200
+    LIMIT {$perPage} OFFSET {$offset}
   ")->fetchAll();
+
+  $navLinks = [];
+  if ($page > 1) {
+    $navLinks[] = "<a href='".url_for("/batches?page=".($page - 1))."'>Prev</a>";
+  }
+  if ($page < $totalPages) {
+    $navLinks[] = "<a href='".url_for("/batches?page=".($page + 1))."'>Next</a>";
+  }
+  $nav = $navLinks ? "<p class='pager'>".implode(' | ', $navLinks)."</p>" : '';
 
   $tbl = "<table>
     <tr><th>Date</th><th>Recipe</th><th>v</th><th class='right'>Target (g)</th><th class='right'>Actual (g)</th><th class='right'>COGS (BWP)</th><th>Actions</th></tr>";
@@ -33,7 +62,7 @@ $router->get('/batches', function () {
   }
   $tbl .= "</table>";
 
-  render('Batches', "<h1>Batches</h1><p><a class='btn' href='".url_for("/recipes")."'>Start a new batch from a recipe</a></p>".$tbl);
+  render('Batches', "<h1>Batches</h1><p><a class='btn' href='".url_for("/recipes")."'>Start a new batch from a recipe</a></p>".$nav.$tbl.$nav);
 });
 
 $router->get('/batches/view', function () {
