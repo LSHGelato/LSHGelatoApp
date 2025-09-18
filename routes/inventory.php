@@ -85,7 +85,7 @@ $router->post('/inventory/adjust/usage', function () {
     INSERT INTO inventory_txns
       (ingredient_id, txn_ts, txn_date, txn_type, qty, unit_kind, unit_cost_bwp, source_table, source_id, note, created_by)
     VALUES
-      (?, NOW(), ?, 'usage', ?, ?, 0, 'manual_adjust', 0, ?, ?)
+      (?, NOW(), ?, 'consumption', ?, ?, 0, 'manual_adjust', 0, ?, ?)
   ");
   $ins->execute([$iid, $date, $delta, $unit, $note !== '' ? $note : null, (int)($_SESSION['user']['id'] ?? 0)]);
 
@@ -123,7 +123,7 @@ $router->post('/inventory/adjust/set-on-hand', function () {
     INSERT INTO inventory_txns
       (ingredient_id, txn_ts, txn_date, txn_type, qty, unit_kind, unit_cost_bwp, source_table, source_id, note, created_by)
     VALUES
-      (?, NOW(), ?, 'stocktake', ?, ?, 0, 'manual_adjust', 0, ?, ?)
+      (?, NOW(), ?, 'adjustment', ?, ?, 0, 'manual_adjust', 0, ?, ?)
   ");
   $autoNote = "Stocktake set to {$tgt} {$unit} (Δ " . number_format($delta,3,'.','') . ")";
   $ins->execute([$iid, $date, $delta, $unit, ($note!==''?$note.' — ':'').$autoNote, (int)($_SESSION['user']['id'] ?? 0)]);
@@ -151,7 +151,7 @@ $router->get('/inventory/history', function () {
   ");
   $tx->execute([$id]); $rows = $tx->fetchAll();
 
-  $tbl = table_open() . "<tr><th>Date</th><th>Type</th><th class='right'>Qty</th><th>Unit</th><th>Note</th></tr>";
+  $tbl = table_open(['Date','Type','Qty','Unit','Note']);
   foreach ($rows as $r) {
     $tbl .= "<tr>
       <td>".h($r['txn_date'])."</td>
@@ -161,7 +161,7 @@ $router->get('/inventory/history', function () {
       <td>".h((string)$r['note'])."</td>
     </tr>";
   }
-  $tbl .= "</table>";
+  $tbl .= table_close();
 
   render('Inventory History', "<h1>History — ".h($I['name'])."</h1>{$tbl}<p><a href='".url_for('/ingredients')."'>Back</a></p>");
 });
