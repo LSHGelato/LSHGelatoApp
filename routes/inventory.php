@@ -38,7 +38,7 @@ $router->get('/inventory/adjust', function () {
 
   <h2>Record a deduction</h2>
   <form method='post' action='".url_for('/inventory/adjust/usage')."' class='row'>
-    <input type='hidden' name='_csrf' value='".h($tok)."'>
+    " . csrf_field($tok) . "
     <input type='hidden' name='ingredient_id' value='".(int)$row['id']."'>
     <div class='col'><label>Date <input type='date' name='date' value='".h($today)."' required></label></div>
     <div class='col'><label>Qty to deduct ({$unit}) <input type='number' name='qty' step='0.001' min='0.001' required></label></div>
@@ -48,7 +48,7 @@ $router->get('/inventory/adjust', function () {
 
   <h2>Set on-hand to an exact amount</h2>
   <form method='post' action='".url_for('/inventory/adjust/set-on-hand')."' class='row'>
-    <input type='hidden' name='_csrf' value='".h($tok)."'>
+    " . csrf_field($tok) . "
     <input type='hidden' name='ingredient_id' value='".(int)$row['id']."'>
     <div class='col'><label>Date <input type='date' name='date' value='".h($today)."' required></label></div>
     <div class='col'><label>Target on hand ({$unit}) <input type='number' name='target_qty' step='0.001' min='0' required></label></div>

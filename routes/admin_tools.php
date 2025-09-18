@@ -16,7 +16,7 @@ $router->get('/admin/tools', function () {
   $tok = csrf_token();
   $body = "<h1>Admin tools</h1>
   <form method='post' action='".url_for("/admin/tools/wac-recalc")."' onsubmit='return confirm(\"Recalculate WAC for all ingredients?\")'>
-    <input type='hidden' name='_csrf' value='".h($tok)."'>
+    " . csrf_field($tok) . "
     <button>Recalculate WAC (all)</button>
   </form>
 
@@ -92,7 +92,7 @@ $router->get('/admin/tools/normalize-po', function() {
   $tbl .= "</table>";
 
   $form = "<form method='post' action='".url_for("/admin/tools/normalize-po/apply")."'>"
-        . "<input type='hidden' name='_csrf' value='".h($tok)."'>"
+        . csrf_field($tok)
         . "<button>Apply normalization to ".count($rows)." line(s)</button></form>";
 
   render('Normalize PO', "<h1>Normalize PO Unit Costs</h1><p>This will convert line totals into per-unit costs and fix WAC.</p>{$tbl}{$form}<p><a href='".url_for("/ingredients")."'>Back</a></p>");
@@ -133,7 +133,7 @@ $router->get('/admin/tools/fix-and-recalc', function() {
   $count = count($rows);
 
   $btn = "<form method='post' action='".url_for("/admin/tools/normalize-po/apply".($iid ? ("?id=".$iid) : ""))."'>"
-       . "<input type='hidden' name='_csrf' value='".h($tok)."'>"
+       . csrf_field($tok)
        . "<button>Fix ".($iid ? ("ingredient ".(int)$iid) : "all ingredients")." ({$count} line(s))</button></form>";
 
   render('Fix & Recalc', "<h1>Fix & Recalc</h1><p>Detected ".(int)$count." line(s) needing normalization.</p>{$btn}");

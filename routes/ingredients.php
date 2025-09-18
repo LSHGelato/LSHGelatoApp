@@ -33,7 +33,7 @@ $router->get('/ingredients', function() {
     $tok = csrf_token();
     $form = "<h2>Add Ingredient</h2>
       <form method='post' action='".url_for("/ingredients/create")."' class='row'>
-        <input type='hidden' name='_csrf' value='".h($tok)."'>
+        " . csrf_field($tok) . "
         <div class='col'><label>Name <input name='name' required></label></div>
         <div class='col'><label>Category <input name='category'></label></div>
         <div class='col'><label>Unit
@@ -79,7 +79,7 @@ $router->get('/ingredients/edit', function() {
   $body = "<h1>Edit ingredient — ".h($ing['name'])."</h1>
   {$quick}
   <form method='post' action='".url_for("/ingredients/update")."'>
-    <input type='hidden' name='_csrf' value='".h($tok)."'>
+    " . csrf_field($tok) . "
     <input type='hidden' name='id' value='".(int)$ing['id']."'>
     <label>Name <input name='name' value='".h($ing['name'])."'></label>
     <label>Category <input name='category' value='".h((string)$ing['category'])."'></label>
