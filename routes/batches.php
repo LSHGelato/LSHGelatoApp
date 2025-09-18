@@ -759,7 +759,7 @@ $router->get('/batches/edit', function () {
 });
 
 $router->post('/batches/update', function () {
-  require_login(); post_only(); csrf_verify();
+  require_login(); post_only();   // post_only() already calls csrf_verify()
   global $pdo;
 
   $id = (int)($_POST['id'] ?? 0);

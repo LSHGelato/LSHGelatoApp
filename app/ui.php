@@ -28,7 +28,8 @@ function render(string $title, string $body): void {
           <a href='".url_for("/health")."'>Health</a>
           <a href='".url_for("/ingredients")."'>Ingredients</a>
           <a href='".url_for("/po")."'>PO</a>
-          <a href='".url_for("/recipes")."'>Recipes</a>";
+          <a href='".url_for("/recipes")."'>Recipes</a>"
+          <a href='".url_for("/batches")."'>Batches</a>";
 
   if (!empty($_SESSION['user'])) {
     $nav .= " <span class='badge'>".h($_SESSION['user']['role'])."</span>";
