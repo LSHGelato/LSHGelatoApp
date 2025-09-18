@@ -28,3 +28,4 @@ var/cache/
 var/tmp/
 *.log
 *.zip
+var/REVISION
