@@ -85,7 +85,7 @@ $router->post('/inventory/adjust/usage', function () {
     INSERT INTO inventory_txns
       (ingredient_id, txn_ts, txn_date, txn_type, qty, unit_kind, unit_cost_bwp, source_table, source_id, note, created_by)
     VALUES
-      (?, NOW(), ?, 'consumption', ?, ?, 0, 'manual_adjust', 0, ?, ?)
+      (?, NOW(), ?, 'consumption', ?, ?, 0, 'manual', 0, ?, ?)
   ");
   $ins->execute([$iid, $date, $delta, $unit, $note !== '' ? $note : null, (int)($_SESSION['user']['id'] ?? 0)]);
 
@@ -123,7 +123,7 @@ $router->post('/inventory/adjust/set-on-hand', function () {
     INSERT INTO inventory_txns
       (ingredient_id, txn_ts, txn_date, txn_type, qty, unit_kind, unit_cost_bwp, source_table, source_id, note, created_by)
     VALUES
-      (?, NOW(), ?, 'adjustment', ?, ?, 0, 'manual_adjust', 0, ?, ?)
+      (?, NOW(), ?, 'adjustment', ?, ?, 0, 'manual', 0, ?, ?)
   ");
   $autoNote = "Stocktake set to {$tgt} {$unit} (Δ " . number_format($delta,3,'.','') . ")";
   $ins->execute([$iid, $date, $delta, $unit, ($note!==''?$note.' — ':'').$autoNote, (int)($_SESSION['user']['id'] ?? 0)]);
