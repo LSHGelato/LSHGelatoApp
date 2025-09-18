@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # Keep GitHub Actions up to date
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # If you add Composer later, this will keep PHP deps fresh
+  - package-ecosystem: "composer"
+    directory: "/"
+    schedule:
+      interval: "weekly"
