@@ -35,8 +35,8 @@ declare(strict_types=1);
         LIMIT 200
       ")->fetchAll();
     
-      $list = "<table>
-        <tr><th>Date</th><th>PO #</th><th>Supplier</th>
+      $list = table_open()
+        . "<tr><th>Date</th><th>PO #</th><th>Supplier</th>
             <th class='right'>Lines</th><th class='right'>Total (BWP)</th><th>Actions</th></tr>";
     
       foreach ($rows as $r) {
@@ -90,7 +90,7 @@ declare(strict_types=1);
                • Currency: ".h($H['currency'])." @ ".number_format((float)$H['fx_rate_used'],6)."</p>
             <p><a href='".url_for("/po/edit?id=".$id)."'>Edit this PO</a></p>";
 
-    $tbl = "<table><tr><th>Ingredient</th><th class='right'>Qty</th><th>Unit</th>
+    $tbl = table_open() . "<tr><th>Ingredient</th><th class='right'>Qty</th><th>Unit</th>
                    <th class='right'>Unit cost (native)</th><th class='right'>Unit cost (BWP)</th><th>Note</th></tr>";
     $total = 0.0;
     foreach ($L as $r) {
@@ -148,7 +148,7 @@ declare(strict_types=1);
       </div>
 
       <fieldset><legend>Lines</legend>
-        <table>
+        ".table_open()."
           <thead>
             <tr><th>Ingredient</th><th>Qty (canonical)</th><th>Line total (native)</th><th>Note</th><th></th></tr>
           </thead>
@@ -334,7 +334,7 @@ declare(strict_types=1);
         </div>";
 
     $tbl = "<fieldset><legend>Lines</legend>
-      <table>
+      ".table_open()."
         <thead>
           <tr><th>Ingredient</th><th>Qty (canonical)</th><th>Line total (native)</th><th>Note</th><th></th></tr>
         </thead>

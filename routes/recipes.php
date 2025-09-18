@@ -24,7 +24,7 @@ $router->get('/recipes', function () {
   $byRecipe = [];
   foreach ($allv as $v) { $byRecipe[(int)$v['recipe_id']][] = $v; }
 
-  $list = "<table><tr><th>Name</th><th>Style</th><th>Versions</th><th>Actions</th></tr>";
+  $list = table_open() . "<tr><th>Name</th><th>Style</th><th>Versions</th><th>Actions</th></tr>";
   foreach ($rs as $r) {
     $rid = (int)$r['rid'];
     $links = '—';
@@ -248,9 +248,9 @@ $router->get('/recipes/view', function () {
   </div>";
 
   // Ingredients table (includes per-line extended cost and the per-ingredient step note)
-  $tbl = "<h2>Ingredients</h2>
-  <table>
-    <tr>
+  $tbl = "<h2>Ingredients</h2>"
+    . table_open()
+    . "<tr>
       <th>Group</th><th class='left'>Ingredient</th><th class='right'>Qty</th><th>Unit</th>
       <th>Primary</th><th class='right'>Cost (BWP)</th><th class='left'>Step notes</th>
     </tr>";
@@ -304,7 +304,7 @@ $router->get('/recipes/items', function() {
                           ORDER BY ri.choice_group, ri.sort_order, i.name");
   $items->execute([$rv_id]); $rows = $items->fetchAll();
 
-    $tbl = "<table><tr>
+    $tbl = table_open() . "<tr>
       <th>Group</th><th>Ingredient</th><th>Qty</th><th>Unit</th>
       <th>Primary</th><th>Cost (BWP)</th><th>Step notes</th><th>Actions</th>
     </tr>";

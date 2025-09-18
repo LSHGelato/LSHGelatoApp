@@ -5,6 +5,14 @@ function pretty_urls(): bool { return ($_ENV['PRETTY_URLS'] ?? '0') === '1'; }
 function url_for(string $p): string { return pretty_urls() ? $p : '/?r=' . ltrim($p, '/'); }
 function h(string $s): string { return htmlspecialchars($s, ENT_QUOTES, 'UTF-8'); }
 
+/** Helper for consistent table styling */
+function table_open(string $attrs = ''): string {
+  $attrs = trim($attrs);
+  return $attrs === ''
+    ? "<table class='table'>"
+    : "<table class='table' " . $attrs . ">";
+}
+
 /** Safe read of var/REVISION (returns null if missing/unreadable) */
 function get_build_revision(): ?string {
   $path = __DIR__ . '/../var/REVISION';

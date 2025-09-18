@@ -10,7 +10,7 @@ $router->get('/admin/fx', function() {
     LIMIT 200
   ")->fetchAll();
 
-  $tbl = "<table><tr><th>Date</th><th>Currency</th><th>Rate → BWP</th></tr>";
+  $tbl = table_open() . "<tr><th>Date</th><th>Currency</th><th>Rate → BWP</th></tr>";
   foreach ($rows as $r) {
     $tbl .= "<tr><td>".h($r['rate_date'])."</td><td>".h($r['currency'])."</td>"
           . "<td class='right'>".number_format((float)$r['rate_to_bwp'],6)."</td></tr>";
