@@ -130,7 +130,7 @@ declare(strict_types=1);
 
     $body = "<h1>New Purchase Order</h1>
     <form method='post' action='".url_for("/po/save")."' id='poForm'>
-      <input type='hidden' name='_csrf' value='".h($tok)."'>
+      ".csrf_field($tok)."
       <div class='row'>
         <div class='col'><label>PO Number <input name='po_number'></label></div>
         <div class='col'><label>Supplier (free text) <input name='supplier'></label></div>
@@ -323,7 +323,7 @@ declare(strict_types=1);
 
     $hdr = "<h1>Edit PO ".h((string)$H['po_number'])."</h1>
       <form method='post' action='".url_for("/po/update")."' id='poEdit'>
-        <input type='hidden' name='_csrf' value='".h($tok)."'>
+        ".csrf_field($tok)."
         <input type='hidden' name='id' value='".(int)$id."'>
         <div class='row'>
           <div class='col'><label>PO Number <input name='po_number' value='".h((string)$H['po_number'])."'></label></div>

@@ -11,8 +11,8 @@ function csrf_token(): string {
     return $t;
 }
 
-function csrf_field(): string {
-    $tok = htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8');
+function csrf_field(?string $token = null): string {
+    $tok = htmlspecialchars($token ?? csrf_token(), ENT_QUOTES, 'UTF-8');
     return "<input type='hidden' name='_csrf' value='".$tok."'>";
 }
 

@@ -51,7 +51,7 @@ $router->get('/recipes', function () {
     $tok = csrf_token();
     $form = "<h2>Create Recipe + Version</h2>
       <form method='post' action='".url_for("/recipes/create")."' class='row'>
-        <input type='hidden' name='_csrf' value='".h($tok)."'>
+        ".csrf_field($tok)."
         <div class='col'><label>Recipe name <input name='name' required></label></div>
         <div class='col'><label>Style
           <select name='style'><option>gelato</option><option>sorbet</option><option>other</option></select></label></div>
@@ -120,7 +120,7 @@ $router->get('/recipes/newversion', function () {
 
   $body = "<h1>New Version</h1>
   <form method='post' action='".url_for("/recipes/newversion/save")."'>
-    <input type='hidden' name='_csrf' value='".h($tok)."'>
+    ".csrf_field($tok)."
     <input type='hidden' name='recipe_id' value='".(int)$recipe_id."'>
     <label>Version # <input name='version_no' type='number' value='".(int)$nextv."'></label>
     <label>Default yield (g) <input name='yield' type='number' step='0.001' value='1100'></label>
@@ -335,7 +335,7 @@ $router->get('/recipes/items', function() {
         <td>
           <a href='".url_for("/recipes/items/edit?id=".(int)$r['id'])."'>Edit</a>
           <form method='post' action='".url_for("/recipes/items/delete")."' style='display:inline' onsubmit='return confirm(\"Remove this item?\")'>
-            <input type='hidden' name='_csrf' value='".h($tok)."'>
+            ".csrf_field($tok)."
             <input type='hidden' name='id' value='".(int)$r['id']."'>
             <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
             <button class='link danger'>Remove</button>
@@ -352,7 +352,7 @@ $router->get('/recipes/items', function() {
   if (role_is('admin')) {
     $pkgForm = "
       <form method='post' action='".url_for("/recipes/version/weights")."' class='row' style='gap:.75rem;align-items:end;margin-top:.35rem'>
-        <input type='hidden' name='_csrf' value='".h($tokPkg)."'>
+        ".csrf_field($tokPkg)."
         <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
         <div class='col'><label>Quart est (g)
           <input name='quart_est_g' type='number' step='0.01' value='".h((string)$version['quart_est_g'])."'></label></div>
@@ -387,7 +387,7 @@ $router->get('/recipes/items', function() {
   $tok = csrf_token();
   $form = "<h3>Add ingredient to version</h3>
     <form method='post' action='".url_for("/recipes/items/add")."' class='row'>
-      <input type='hidden' name='_csrf' value='".h($tok)."'>
+      ".csrf_field($tok)."
       <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
       <div class='col'><label>Ingredient <select name='ingredient_id'>{$opt}</select></label></div>
       <div class='col'><label>Qty <input type='number' name='qty' step='0.001' required></label></div>
@@ -409,7 +409,7 @@ $router->get('/recipes/items', function() {
     $steps_html .= "<li>"
       . h($s['instruction'])
       . " <form method='post' action='".url_for("/recipes/steps/move")."' style='display:inline'>
-           <input type='hidden' name='_csrf' value='".h($tokSteps)."'>
+           ".csrf_field($tokSteps)."
            <input type='hidden' name='id' value='".(int)$s['id']."'>
            <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
            <button class='link' name='dir' value='up'>&uarr;</button>
@@ -417,7 +417,7 @@ $router->get('/recipes/items', function() {
           </form>
           <a href='".url_for("/recipes/steps/edit?id=".(int)$s['id'])."'>Edit</a>
           <form method='post' action='".url_for("/recipes/steps/delete")."' style='display:inline' onsubmit='return confirm(\"Delete this step?\")'>
-            <input type='hidden' name='_csrf' value='".h($tokSteps)."'>
+            ".csrf_field($tokSteps)."
             <input type='hidden' name='id' value='".(int)$s['id']."'>
             <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
             <button class='link danger'>Delete</button>
@@ -433,7 +433,7 @@ $router->get('/recipes/items', function() {
   $tok_step = csrf_token();
   $steps_form = "<h4>Add step</h4>
     <form method='post' action='".url_for("/recipes/steps/add")."' class='row'>
-      <input type='hidden' name='_csrf' value='".h($tok_step)."'>
+      ".csrf_field($tok_step)."
       <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
       <div class='col'><label>Step # <input name='step_no' type='number' min='1' value='".(int)$next_no."'></label></div>
       <div class='col' style='flex:2'><label>Instruction <input name='instruction' required placeholder='e.g., Heat milk to 45°C; dissolve sugars; chill…'></label></div>
@@ -451,7 +451,7 @@ $router->get('/recipes/items', function() {
     $tok_lib = csrf_token();
     $steps_form .= "<h4>Insert from library</h4>
       <form method='post' action='".url_for("/recipes/steps/add-from-library")."' class='row'>
-        <input type='hidden' name='_csrf' value='".h($tok_lib)."'>
+        ".csrf_field($tok_lib)."
         <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
         <div class='col'><label>Step # <input name='step_no' type='number' min='1' value='".(int)$next_no."'></label></div>
         <div class='col' style='flex:2'><label>Library <select name='library_id'>{$opts}</select></label></div>
@@ -476,7 +476,7 @@ $router->get('/recipes/items', function() {
     $tok_clone = csrf_token();
     $steps_form .= "<h4>Clone steps from another version</h4>
       <form method='post' action='".url_for("/recipes/steps/clone")."' class='row' onsubmit='return confirm(\"Append all steps from the selected version?\")'>
-        <input type='hidden' name='_csrf' value='".h($tok_clone)."'>
+        ".csrf_field($tok_clone)."
         <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
         <div class='col' style='flex:2'><label>Source version <select name='from_rv_id'>{$o}</select></label></div>
         <button>Clone steps</button>
@@ -498,7 +498,7 @@ $router->get('/recipes/items/edit', function() {
   $tok = csrf_token();
   $body = "<h1>Edit item — ".h($ri['name'])."</h1>
   <form method='post' action='".url_for("/recipes/items/update")."'>
-    <input type='hidden' name='_csrf' value='".h($tok)."'>
+    ".csrf_field($tok)."
     <input type='hidden' name='id' value='".(int)$ri['id']."'>
     <input type='hidden' name='rv_id' value='".(int)$ri['recipe_version_id']."'>
     <label>Choice group <input type='number' name='choice_group' value='".(int)$ri['choice_group']."'></label>
@@ -665,7 +665,7 @@ $router->get('/recipes/steps/edit', function() {
   $tok = csrf_token();
   $body = "<h1>Edit step</h1>
     <form method='post' action='".url_for("/recipes/steps/update")."'>
-      <input type='hidden' name='_csrf' value='".h($tok)."'>
+      ".csrf_field($tok)."
       <input type='hidden' name='id' value='".(int)$row['id']."'>
       <input type='hidden' name='rv_id' value='".(int)$row['recipe_version_id']."'>
       <label>Step # <input name='step_no' type='number' min='1' value='".(int)$row['step_no']."'></label>

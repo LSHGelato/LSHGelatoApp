@@ -163,7 +163,7 @@ $router->get('/batches/new', function() {
 
   $hdr = "<h1>New Batch — ".h($v['recipe_name'])." v".(int)$v['version_no']."</h1>
     <form method='post' action='".url_for("/batches/save")."' id='batchForm'>
-      <input type='hidden' name='_csrf' value='".h($tok)."'>
+      ".csrf_field($tok)."
       <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
       <input type='hidden' name='default_yield' value='".number_format((float)$v['default_yield_g'],3,'.','')."'>
 
@@ -556,7 +556,7 @@ $router->get('/batches/edit', function () {
   
   $hdr = "<h1>Edit Batch #".(int)$B['id']." — ".h($B['recipe_name'])." v".(int)$B['version_no']."</h1>
   <form method='post' action='".url_for("/batches/update")."' id='batchEdit'>
-    <input type='hidden' name='_csrf' value='".h($tok)."'>
+    ".csrf_field($tok)."
     <input type='hidden' name='id' value='".(int)$B['id']."'>
     <input type='hidden' name='default_yield' value='".number_format((float)$B['default_yield_g'],3,'.','')."'>
 
