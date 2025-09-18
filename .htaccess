@@ -22,6 +22,9 @@ RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.php [QSA,L]
 
+# Disable directory listing
+Options -Indexes
+
 # Block dotfiles and sensitive files
 <FilesMatch "^\.(env|htaccess|git|svn)">
   Require all denied
@@ -32,3 +35,23 @@ RedirectMatch 404 ^/(app|migrations|logs)(/|$)
 
 SetEnv SESSION_SAVE_PATH /home1/raneywor/sessions
 SetEnv COOKIE_DOMAIN gelato.raneyworld.com
+
+# Block .git and dotfiles
+RedirectMatch 404 /(\.git|\.env|\.github)(/|$)
+<FilesMatch "^\.(.*)$">
+  Require all denied
+</FilesMatch>
+
+# Never serve these
+<FilesMatch "(^|/)(env\.local\.php|phpunit\.xml|composer\.(json|lock))$">
+  Require all denied
+</FilesMatch>
+
+# Project-specific: block internal tools if they must stay present
+<FilesMatch "^(peek-log\.php|enrichment_selftest\.php|admin_wac_repair\.php)$">
+  Require all denied
+</FilesMatch>
+
+# Block whole directories that are app-internal
+RedirectMatch 404 ^/var(/|$)
+RedirectMatch 404 ^/migrations(/|$)

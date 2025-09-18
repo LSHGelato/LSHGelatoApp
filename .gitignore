@@ -29,3 +29,4 @@ var/tmp/
 *.log
 *.zip
 var/REVISION
+error_log
