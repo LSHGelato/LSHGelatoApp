@@ -51,7 +51,7 @@ $router->get('/ingredients', function() {
 });
 
 $router->get('/ingredients/edit', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   global $pdo;
 
   $id = (int)($_GET['id'] ?? 0);
@@ -107,7 +107,7 @@ $router->get('/ingredients/edit', function() {
 });
 
 $router->post('/ingredients/update', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   post_only(); global $pdo;
   $stmt = $pdo->prepare("UPDATE ingredients
     SET name=?, category=?, unit_kind=?, reorder_point=?, solids_pct=?, fat_pct=?, sugar_pct=?, is_active=?
@@ -125,7 +125,7 @@ $router->post('/ingredients/update', function() {
 });
 
 $router->get('/ingredients/delete', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   global $pdo;
   $id = (int)($_GET['id'] ?? 0);
   $pdo->prepare("UPDATE ingredients SET is_active=0 WHERE id=?")->execute([$id]);
@@ -133,7 +133,7 @@ $router->get('/ingredients/delete', function() {
 });
 
 $router->post('/ingredients/create', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   post_only(); global $pdo;
   $stmt = $pdo->prepare("INSERT INTO ingredients (name, category, unit_kind, reorder_point, solids_pct, fat_pct, sugar_pct, is_active) VALUES (?,?,?,?,?,?,?,1)");
   $stmt->execute([

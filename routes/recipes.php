@@ -70,7 +70,7 @@ $router->get('/recipes', function () {
 });
 
 $router->post('/recipes/create', function () {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   post_only();
   global $pdo;
 
@@ -109,7 +109,7 @@ $router->post('/recipes/create', function () {
 
 /* ---------- New version ---------- */
 $router->get('/recipes/newversion', function () {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   global $pdo;
   $recipe_id = (int)($_GET['recipe_id'] ?? 0);
   if ($recipe_id<=0) { http_response_code(400); exit('Bad recipe id'); }
@@ -138,7 +138,7 @@ $router->get('/recipes/newversion', function () {
 });
 
 $router->post('/recipes/newversion/save', function () {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   post_only(); global $pdo;
 
   $st = $pdo->prepare("
@@ -166,7 +166,7 @@ $router->post('/recipes/newversion/save', function () {
 
 /* ---------- Inline editor for package weights ---------- */
 $router->post('/recipes/version/weights', function () {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   post_only(); global $pdo;
 
   $rv_id = (int)($_POST['rv_id'] ?? 0);
@@ -489,7 +489,7 @@ $router->get('/recipes/items', function() {
 
 /* ---------- Item CRUD ---------- */
 $router->get('/recipes/items/edit', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   global $pdo;
   $id = (int)($_GET['id'] ?? 0);
   $st = $pdo->prepare('SELECT ri.*, i.name FROM recipe_items ri JOIN ingredients i ON i.id=ri.ingredient_id WHERE ri.id=?');
@@ -516,7 +516,7 @@ $router->get('/recipes/items/edit', function() {
 });
 
 $router->post('/recipes/items/update', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   post_only(); global $pdo;
   $rv_id = (int)($_POST['rv_id'] ?? 0);
   $stmt = $pdo->prepare("UPDATE recipe_items
@@ -535,7 +535,7 @@ $router->post('/recipes/items/update', function() {
 });
 
 $router->post('/recipes/items/delete', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   post_only(); global $pdo;
   $rv_id = (int)($_POST['rv_id'] ?? 0);
   $id    = (int)($_POST['id'] ?? 0);
@@ -545,7 +545,7 @@ $router->post('/recipes/items/delete', function() {
 });
 
 $router->post('/recipes/items/add', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   post_only(); global $pdo;
 
   $rv_id        = (int)($_POST['rv_id'] ?? 0);
@@ -592,7 +592,7 @@ $router->post('/recipes/items/add', function() {
 
 /* ---------- Steps ---------- */
 $router->post('/recipes/steps/add', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   post_only(); global $pdo;
   $rv_id  = (int)($_POST['rv_id'] ?? 0);
   $instr  = trim($_POST['instruction'] ?? '');
@@ -626,7 +626,7 @@ $router->post('/recipes/steps/add', function() {
 });
 
 $router->post('/recipes/steps/add-from-library', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   post_only(); global $pdo;
   $rv_id = (int)($_POST['rv_id'] ?? 0);
   $libId = (int)($_POST['library_id'] ?? 0);
@@ -656,7 +656,7 @@ $router->post('/recipes/steps/add-from-library', function() {
 });
 
 $router->get('/recipes/steps/edit', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   global $pdo;
   $id = (int)($_GET['id'] ?? 0);
   $st = $pdo->prepare('SELECT * FROM recipe_steps WHERE id=?');
@@ -677,7 +677,7 @@ $router->get('/recipes/steps/edit', function() {
 });
 
 $router->post('/recipes/steps/update', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   post_only(); global $pdo;
 
   $id = (int)($_POST['id'] ?? 0);
@@ -719,7 +719,7 @@ $router->post('/recipes/steps/update', function() {
 });
 
 $router->post('/recipes/steps/delete', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   post_only(); global $pdo;
   $id = (int)($_POST['id'] ?? 0);
   $rv_id = (int)($_POST['rv_id'] ?? 0);
@@ -738,7 +738,7 @@ $router->post('/recipes/steps/delete', function() {
 });
 
 $router->post('/recipes/steps/move', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   post_only(); global $pdo;
   $id = (int)($_POST['id'] ?? 0);
   $rv_id = (int)($_POST['rv_id'] ?? 0);
@@ -775,7 +775,7 @@ $router->post('/recipes/steps/move', function() {
 });
 
 $router->post('/recipes/steps/clone', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   post_only(); global $pdo;
   $rv_id = (int)($_POST['rv_id'] ?? 0);
   $from  = (int)$_POST['from_rv_id'];

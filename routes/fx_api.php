@@ -1,6 +1,6 @@
 <?php
 $router->get('/fx/quote', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   header('Content-Type: application/json');
   $date = $_GET['date'] ?? date('Y-m-d');
   $cur  = strtoupper($_GET['currency'] ?? 'BWP');

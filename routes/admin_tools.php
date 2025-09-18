@@ -11,7 +11,7 @@ declare(strict_types=1);
  */
 
 $router->get('/admin/tools', function () {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
 
   $tok = csrf_token();
   $body = "<h1>Admin tools</h1>
@@ -31,7 +31,7 @@ $router->get('/admin/tools', function () {
 });
 
 $router->post('/admin/tools/wac-recalc', function () {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   post_only(); // post_only() already calls csrf_verify()
   global $pdo;
 
@@ -44,7 +44,7 @@ $router->post('/admin/tools/wac-recalc', function () {
 });
 
 $router->get('/admin/tools/log', function () {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
 
   // Try to read error_log (path from PHP config). If not readable, say so.
   $path = ini_get('error_log') ?: __DIR__ . '/../error_log';
@@ -65,7 +65,7 @@ $router->get('/admin/tools/log', function () {
 });
 
 $router->get('/admin/tools/normalize-po', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   if (!function_exists('find_po_lines_needing_normalization')) { require_once __DIR__ . '/../app/po_normalize_tools.php'; }
   global $pdo;
 
@@ -99,7 +99,7 @@ $router->get('/admin/tools/normalize-po', function() {
 });
 
 $router->post('/admin/tools/normalize-po/apply', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   if (!function_exists('find_po_lines_needing_normalization')) { require_once __DIR__ . '/../app/po_normalize_tools.php'; }
   post_only(); global $pdo;
 
@@ -123,7 +123,7 @@ $router->post('/admin/tools/normalize-po/apply', function() {
 });
 
 $router->get('/admin/tools/fix-and-recalc', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   if (!function_exists('find_po_lines_needing_normalization')) { require_once __DIR__ . '/../app/po_normalize_tools.php'; }
   global $pdo;
 
@@ -140,7 +140,7 @@ $router->get('/admin/tools/fix-and-recalc', function() {
 });
 
 $router->get('/admin/timecheck', function () {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   global $pdo;
 
   $phpNow = date('Y-m-d H:i:s T');
