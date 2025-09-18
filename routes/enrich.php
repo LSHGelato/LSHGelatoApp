@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 $router->get('/admin/enrich', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   if (!function_exists('enrich_one')) { http_response_code(404); render('Enrich', "<p class='err'>Enrichment module not installed.</p>"); return; }
   global $pdo;
   $rows = $pdo->query("SELECT id,name,solids_pct,fat_pct,sugar_pct,nutrition_source,nutrition_confidence FROM ingredients WHERE is_active=1 ORDER BY name")->fetchAll();
@@ -19,7 +19,7 @@ $router->get('/admin/enrich', function() {
 });
 
 $router->get('/admin/enrich/run', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   if (!function_exists('enrich_one')) { http_response_code(404); render('Enrich', "<p class='err'>Enrichment module not installed.</p>"); return; }
   global $pdo;
   $id = (int)($_GET['id'] ?? 0); if ($id<=0) { http_response_code(400); exit('Bad id'); }

@@ -15,7 +15,7 @@ declare(strict_types=1);
 
     // ---- LIST: GET /po ----
     if ($is('GET','/po')) {
-      require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+      require_admin();
     
       $rows = $pdo->query("
         SELECT
@@ -64,7 +64,7 @@ declare(strict_types=1);
 
   // ---- VIEW: GET /po/view?id=... ----
   if ($is('GET','/po/view')) {
-    require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+    require_admin();
     $id = (int)($_GET['id'] ?? 0); if ($id<=0) { http_response_code(400); exit('Bad id'); }
 
     $po = $pdo->prepare("
@@ -113,7 +113,7 @@ declare(strict_types=1);
 
   // ---- NEW: GET /po/new ----
   if ($is('GET','/po/new')) {
-    require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+    require_admin();
     $ing = $pdo->query("SELECT id,name,unit_kind FROM ingredients WHERE is_active=1 ORDER BY name")->fetchAll();
     $opt = ""; foreach ($ing as $i) { $opt .= "<option value='".(int)$i['id']."'>".h($i['name'])." (".h($i['unit_kind']).")</option>"; }
 
@@ -212,7 +212,7 @@ declare(strict_types=1);
 
   // ---- SAVE: POST /po/save ----
   if ($is('POST','/po/save')) {
-    require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+    require_admin();
     csrf_verify();
 
     db_tx(function(PDO $pdo) {
@@ -288,7 +288,7 @@ declare(strict_types=1);
 
   // ---- EDIT: GET /po/edit?id=... ----
   if ($is('GET','/po/edit')) {
-    require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+    require_admin();
     $id = (int)($_GET['id'] ?? 0); if ($id<=0) { http_response_code(400); exit('Bad id'); }
 
     $po = $pdo->prepare("
@@ -395,7 +395,7 @@ declare(strict_types=1);
 
   // ---- UPDATE: POST /po/update ----
   if ($is('POST','/po/update')) {
-    require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+    require_admin();
     csrf_verify();
 
     $id          = (int)($_POST['id'] ?? 0);

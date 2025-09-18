@@ -52,7 +52,16 @@ function post_only(): void {
   if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') { http_response_code(405); exit('Method Not Allowed'); }
   csrf_verify();
 }
-function require_login(): void { if (empty($_SESSION['user'])) { header('Location: ' . url_for('/login')); exit; } }
+function require_login(): void {
+  if (empty($_SESSION['user'])) {
+    header('Location: ' . url_for('/login'));
+    exit;
+  }
+}
+function require_admin(): void {
+  require_login();
+  if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+}
 function role_is(string $role): bool {
   return !empty($_SESSION['user']) && ($_SESSION['user']['role'] === $role || $_SESSION['user']['role'] === 'admin');
 }

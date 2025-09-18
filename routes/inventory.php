@@ -9,7 +9,7 @@ declare(strict_types=1);
  */
 
 $router->get('/inventory/adjust', function () {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   global $pdo;
 
   $id = (int)($_GET['id'] ?? 0);
@@ -62,7 +62,7 @@ $router->get('/inventory/adjust', function () {
 });
 
 $router->post('/inventory/adjust/usage', function () {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   csrf_verify(); global $pdo;
 
   $iid  = (int)($_POST['ingredient_id'] ?? 0);
@@ -93,7 +93,7 @@ $router->post('/inventory/adjust/usage', function () {
 });
 
 $router->post('/inventory/adjust/set-on-hand', function () {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   csrf_verify(); global $pdo;
 
   $iid   = (int)($_POST['ingredient_id'] ?? 0);
@@ -132,7 +132,7 @@ $router->post('/inventory/adjust/set-on-hand', function () {
 });
 
 $router->get('/inventory/history', function () {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   global $pdo;
 
   $id = (int)($_GET['id'] ?? 0);

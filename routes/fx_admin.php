@@ -1,6 +1,6 @@
 <?php
 $router->get('/admin/fx', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
 
   global $pdo;
   $rows = $pdo->query("
@@ -45,7 +45,7 @@ $router->get('/admin/fx', function() {
 });
 
 $router->post('/admin/fx/save', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   post_only();
 
   global $pdo;
@@ -67,7 +67,7 @@ $router->post('/admin/fx/save', function() {
 });
 
 $router->post('/admin/fx/bulk', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   post_only();
 
   global $pdo;
@@ -96,7 +96,7 @@ $router->post('/admin/fx/bulk', function() {
 });
 
 $router->get('/admin/fx/export', function() {
-  require_login(); if (!role_is('admin')) { http_response_code(403); exit('Forbidden'); }
+  require_admin();
   header('Content-Type: text/csv; charset=UTF-8');
   header('Content-Disposition: attachment; filename="exchange_rates.csv"');
   global $pdo;
