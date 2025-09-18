@@ -46,8 +46,8 @@ $router->get('/batches', function () {
   }
   $nav = $navLinks ? "<p class='pager'>".implode(' | ', $navLinks)."</p>" : '';
 
-  $tbl = "<table>
-    <tr><th>Date</th><th>Recipe</th><th>v</th><th class='right'>Target (g)</th><th class='right'>Actual (g)</th><th class='right'>COGS (BWP)</th><th>Actions</th></tr>";
+  $tbl = table_open()
+    . "<tr><th>Date</th><th>Recipe</th><th>v</th><th class='right'>Target (g)</th><th class='right'>Actual (g)</th><th class='right'>COGS (BWP)</th><th>Actions</th></tr>";
   foreach ($rows as $r) {
     $tbl .= "<tr>
       <td>".h(date('Y-m-d H:i', strtotime($r['batch_date'])))."</td>
@@ -93,7 +93,7 @@ $router->get('/batches/view', function () {
   ");
   $res->execute([$id]); $rows = $res->fetchAll();
 
-  $tbl = "<table><tr><th>Ingredient</th><th class='right'>Measured</th><th>Unit</th><th class='right'>WAC</th><th class='right'>Ext (BWP)</th></tr>";
+  $tbl = table_open() . "<tr><th>Ingredient</th><th class='right'>Measured</th><th>Unit</th><th class='right'>WAC</th><th class='right'>Ext (BWP)</th></tr>";
   $total = 0.0;
   foreach ($rows as $r) {
     $m = (float)($r['measured_qty'] ?? 0);
@@ -120,7 +120,7 @@ $router->get('/batches/view', function () {
   ");
   $po->execute([$id]); $packs = $po->fetchAll();
 
-  $packTable = "<table><tr><th>Package</th><th class='right'>Units</th><th class='right'>Nominal g</th><th class='right'>Total g</th></tr>";
+  $packTable = table_open() . "<tr><th>Package</th><th class='right'>Units</th><th class='right'>Nominal g</th><th class='right'>Total g</th></tr>";
   $packTotal = 0.0;
   foreach ($packs as $p) {
     $u = (int)$p['unit_count'];
@@ -216,7 +216,7 @@ $router->get('/batches/new', function() {
 
       <h2>Ingredients checklist</h2>";
 
-  $tbl = "<table id='chk'><tr>
+  $tbl = table_open("id='chk'") . "<tr>
             <th class='left'>Group</th>
             <th class='left'>Ingredient</th>
             <th>Recipe qty</th>
@@ -631,7 +631,7 @@ $router->get('/batches/edit', function () {
     <h2>Ingredients checklist (adjust if needed)</h2>";
 
   // Build table (like /batches/new) but pre-filled from resolutions
-  $tbl = "<table id='chk'><tr>
+  $tbl = table_open("id='chk'") . "<tr>
             <th class='left'>Group</th>
             <th class='left'>Ingredient</th>
             <th>Scaled qty</th>

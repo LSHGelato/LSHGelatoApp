@@ -32,7 +32,7 @@ $router->get('/ingredients', function() {
   }
   $nav = $navLinks ? "<p class='pager'>".implode(' | ', $navLinks)."</p>" : '';
 
-  $list = "<table><tr><th>Name</th><th>Unit</th><th>On hand</th><th>WAC (BWP/u)</th><th>Reorder</th>";
+  $list = table_open() . "<tr><th>Name</th><th>Unit</th><th>On hand</th><th>WAC (BWP/u)</th><th>Reorder</th>";
   if (role_is('admin')) { $list .= "<th>Actions</th>"; }
   $list .= "</tr>";
 

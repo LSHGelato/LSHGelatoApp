@@ -78,7 +78,7 @@ $router->get('/admin/tools/normalize-po', function() {
   }
 
   $tok = csrf_token();
-  $tbl = "<table><tr><th>POL</th><th>Ingredient</th><th class='right'>Qty</th><th class='right'>FX</th><th class='right'>Current itxn unit BWP</th><th class='right'>Expected per-unit BWP</th></tr>";
+  $tbl = table_open() . "<tr><th>POL</th><th>Ingredient</th><th class='right'>Qty</th><th class='right'>FX</th><th class='right'>Current itxn unit BWP</th><th class='right'>Expected per-unit BWP</th></tr>";
   foreach ($rows as $r) {
     $tbl .= "<tr>"
           . "<td>".h((string)$r['pol_id'])."</td>"

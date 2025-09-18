@@ -151,7 +151,7 @@ $router->get('/inventory/history', function () {
   ");
   $tx->execute([$id]); $rows = $tx->fetchAll();
 
-  $tbl = "<table><tr><th>Date</th><th>Type</th><th class='right'>Qty</th><th>Unit</th><th>Note</th></tr>";
+  $tbl = table_open() . "<tr><th>Date</th><th>Type</th><th class='right'>Qty</th><th>Unit</th><th>Note</th></tr>";
   foreach ($rows as $r) {
     $tbl .= "<tr>
       <td>".h($r['txn_date'])."</td>
