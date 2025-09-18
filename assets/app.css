@@ -1,0 +1,23 @@
+:root { --fg:#111; --muted:#666; --bg:#fff; --ok:#0a0; --warn:#b8860b; --err:#b00; }
+*{box-sizing:border-box}
+body{font-family:system-ui,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--fg);margin:2rem;max-width:980px}
+header{display:flex;justify-content:space-between;align-items:center}
+nav a{margin-right:1rem}
+table{border-collapse:collapse;width:100%;margin:1rem 0}
+th,td{border:1px solid #ddd;padding:.5rem;text-align:left}
+th{background:#f7f7f7}
+input,select,button,textarea{font:inherit;padding:.4rem .5rem}
+label{display:block;margin:.25rem 0}
+form.inline label{display:inline-block;margin-right:.5rem}
+.badge{display:inline-block;padding:.15rem .4rem;border-radius:.25rem;background:#eee;color:#333;font-size:.8rem;margin-left:.4rem}
+.warn{color:var(--warn)}
+.ok{color:var(--ok)}
+.err{color:var(--err)}
+fieldset{border:1px solid #ddd;padding:1rem;margin:1rem 0}
+legend{padding:0 .5rem;color:#333}
+.small{font-size:.9rem;color:var(--muted)}
+.row{display:flex;gap:1rem;flex-wrap:wrap}
+.col{flex:1 1 280px}
+hr{margin:1rem 0}
+a.btn { display:inline-block; padding:.4rem .7rem; border:1px solid #888; border-radius:.5rem; text-decoration:none }
+a.btn:hover { background:#f6f6f6 }
