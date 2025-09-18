@@ -20,3 +20,11 @@ composer.lock
 # IDE
 .vscode/
 .idea/
+
+# local/secrets/runtime
+app/env.local.php
+var/sessions/
+var/cache/
+var/tmp/
+*.log
+*.zip
