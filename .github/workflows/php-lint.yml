@@ -1,0 +1,39 @@
+name: PHP and Shell Lint
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Run PHP lint
+        run: |
+          set -eo pipefail
+          php_files=$(find . -type f -name '*.php')
+          if [ -n "$php_files" ]; then
+            for file in $php_files; do
+              php -l "$file"
+            done
+          else
+            echo "No PHP files to lint."
+          fi
+
+      - name: Run ShellCheck
+        run: |
+          set -eo pipefail
+          if compgen -G 'bin/*.sh' > /dev/null; then
+            shellcheck bin/*.sh
+          else
+            echo "No shell scripts to lint."
+          fi
