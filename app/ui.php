@@ -42,14 +42,19 @@ function require_admin(): void {
 }
 
 /**
- * Open an HTML table with a header row.
+ * Open a table, optionally with a header row.
  *
- * @param array<int,string>                    $headers Column headers.
- * @param array<string,string>|string          $attrs   Optional attributes
- *                                                     (assoc array or raw string).
- * @return string The opening <table> and the header <tr>.
+ * Usage:
+ *   // legacy style: build your own <tr><th>...</th></tr>
+ *   $html = table_open();           // returns "<table>"
+ *
+ *   // helper style: pass headers and we’ll emit the header row
+ *   $html = table_open(['A','B']);  // returns "<table><tr><th>A</th><th>B</th></tr>"
+ *
+ * @param array<int,string>               $headers  Optional list of column headers
+ * @param array<string,string>|string     $attrs    Optional attributes map or raw string
  */
-function table_open(array $headers, $attrs = ''): string {
+function table_open(array $headers = [], $attrs = ''): string {
   $attrStr = '';
   if (is_array($attrs)) {
     foreach ($attrs as $k => $v) {
@@ -61,6 +66,11 @@ function table_open(array $headers, $attrs = ''): string {
     if ($attrs !== '' && $attrs[0] !== ' ') $attrs = ' ' . $attrs;
     $attrStr = $attrs;
   }
+
+  if (empty($headers)) {
+    return "<table{$attrStr}>";
+  }
+
   $th = '';
   foreach ($headers as $hcell) {
     $th .= '<th>' . h((string)$hcell) . '</th>';
@@ -68,21 +78,6 @@ function table_open(array $headers, $attrs = ''): string {
   return "<table{$attrStr}><tr>{$th}</tr>";
 }
 
-/**
- * Build a table row (<tr>) from cell definitions.
- *
- * Each cell can be:
- *  - string: treated as raw HTML
- *  - array:  [
- *              'text'  => 'will be escaped'  (mutually exclusive with 'html'),
- *              'html'  => '<b>raw</b>',
- *              'class' => 'right',
- *              'tag'   => 'td'|'th'
- *            ]
- *
- * @param array<int, string|array{text?:string, html?:string, class?:string, tag?:string}> $cells
- * @return string HTML <tr>…</tr>
- */
 function table_row(array $cells): string {
   $row = '';
   foreach ($cells as $c) {
