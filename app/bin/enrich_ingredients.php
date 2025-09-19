@@ -1,6 +1,16 @@
 <?php
 declare(strict_types=1);
+
+require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/../enrichment.php';
+
+// Ensure we have a PDO and make it visible to static analysis.
+if (!isset($GLOBALS['pdo']) || !($GLOBALS['pdo'] instanceof PDO)) {
+    fwrite(STDERR, "DB bootstrap failed: \$pdo not initialized.\n");
+    exit(1);
+}
+/** @var PDO $pdo */
+$pdo = $GLOBALS['pdo'];
 
 $uid = 1; // system/audit user id; adjust if desired
 

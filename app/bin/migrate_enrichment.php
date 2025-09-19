@@ -1,6 +1,15 @@
 <?php
 declare(strict_types=1);
+
+require_once __DIR__ . '/../bootstrap.php';
 require_once __DIR__ . '/../db.php';
+
+if (!isset($GLOBALS['pdo']) || !($GLOBALS['pdo'] instanceof PDO)) {
+    fwrite(STDERR, "DB bootstrap failed: \$pdo not initialized.\n");
+    exit(1);
+}
+/** @var PDO $pdo */
+$pdo = $GLOBALS['pdo'];
 
 function has_table(PDO $pdo, string $name): bool {
   $stmt = $pdo->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=?");
