@@ -1,17 +1,20 @@
 parameters:
   level: 1
+
+  # Make PHPStan aware of $router/$pdo for the routes/*
   bootstrapFiles:
     - phpstan-bootstrap.php
 
-  # Only analyze our application code (skip CLI helpers etc.)
+  # Only analyze our application code
   paths:
     - app
     - routes
 
+  # (Optional) If you want to ignore CLI helpers under app/bin
   excludePaths:
-    - app/bin
-    - enrichment_selftest.php
+    analyse:
+      - app/bin/*
 
-  # Keep things beginner-friendly for now
+  # Keep things beginner-friendly; we can dial up later
   checkMissingIterableValueType: false
   checkGenericClassInNonGenericObjectType: false
