@@ -49,21 +49,58 @@ $router->get('/recipes', function () {
   $form = "";
   if (role_is('admin')) {
     $tok = csrf_token();
-    $form = "<h2>Create Recipe + Version</h2>
-      <form method='post' action='".url_for("/recipes/create")."' class='row'>
+    $form = "
+      <h2>Create Recipe + Version</h2>
+      <form method='post' action='".url_for("/recipes/create")."' class='form-grid form-3' id='recipeCreate'>
         ".csrf_field($tok)."
-        <div class='col'><label>Recipe name <input name='name' required></label></div>
-        <div class='col'><label>Style
-          <select name='style'><option>gelato</option><option>sorbet</option><option>other</option></select></label></div>
-        <div class='col'><label>Default yield (g) <input name='yield' type='number' step='0.001' value='1100'></label></div>
-        <div class='col'><label>PAC <input name='pac' type='number' step='0.001'></label></div>
-        <div class='col'><label>POD <input name='pod' type='number' step='0.001'></label></div>
-        <div class='col'><label>Alt resolution <select name='alt'><option value='primary'>primary</option><option value='heaviest'>heaviest</option></select></label></div>
-        <div class='col'><label>Quart est (g) <input name='quart_est_g' type='number' step='0.01'></label></div>
-        <div class='col'><label>Pint est (g) <input name='pint_est_g' type='number' step='0.01'></label></div>
-        <div class='col'><label>Single est (g) <input name='single_est_g' type='number' step='0.01'></label></div>
-        <button>Create</button>
-      </form>";
+    
+        <label>Recipe name
+          <input name='name' required>
+        </label>
+    
+        <label>Style
+          <select name='style'>
+            <option value='gelato'>gelato</option>
+            <option value='sorbet'>sorbet</option>
+          </select>
+        </label>
+    
+        <label>Default yield (g)
+          <input type='number' step='0.001' name='default_yield_g' value='1100'>
+        </label>
+    
+        <label>PAC
+          <input type='number' step='0.001' name='pac' placeholder='e.g., 240.000'>
+        </label>
+    
+        <label>POD
+          <input type='number' step='0.001' name='pod' placeholder='e.g., 32.000'>
+        </label>
+    
+        <label>Alt resolution
+          <select name='alt_resolution'>
+            <option value='primary' selected>primary</option>
+            <option value='heaviest'>heaviest</option>
+          </select>
+        </label>
+    
+        <label>Quart est (g)
+          <input type='number' step='0.01' name='quart_est_g' placeholder='e.g., 950.00'>
+        </label>
+    
+        <label>Pint est (g)
+          <input type='number' step='0.01' name='pint_est_g' placeholder='e.g., 475.00'>
+        </label>
+    
+        <label>Single est (g)
+          <input type='number' step='0.01' name='single_est_g' placeholder='e.g., 115.00'>
+        </label>
+    
+        <div class='form-actions'>
+          <button>Create</button>
+        </div>
+      </form>
+    ";
   }
 
   render('Recipes', "<h1>Recipes</h1>".$list.$form);

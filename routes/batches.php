@@ -72,7 +72,7 @@ $router->get('/batches/view', function () {
   if ($id <= 0) { http_response_code(400); exit('Bad id'); }
 
   $h = $pdo->prepare("
-    SELECT b.*, r.name AS recipe_name, rv.version_no
+    SELECT b.*, r.name AS recipe_name, rv.version_no, rv.quart_est_g, rv.pint_est_g, rv.single_est_g
     FROM batches b
     JOIN recipe_versions rv ON rv.id = b.recipe_version_id
     JOIN recipes r          ON r.id = rv.recipe_id
@@ -110,22 +110,49 @@ $router->get('/batches/view', function () {
   $tbl .= "<tr><td colspan='4' class='right'><strong>Total COGS snapshot</strong></td>
              <td class='right'><strong>".number_format($total,2)."</strong></td></tr></table>";
 
-  // Packouts
+  // Packouts (use recipe-version weights; default 0 if missing)
   $po = $pdo->prepare("
-    SELECT p.name, p.nominal_g_per_unit, bp.unit_count
+    SELECT p.name, bp.unit_count
     FROM batch_packouts bp
     JOIN package_types p ON p.id = bp.package_type_id
     WHERE bp.batch_id = ?
     ORDER BY p.name
   ");
-  $po->execute([$id]); $packs = $po->fetchAll();
+  $po->execute([$id]); 
+  $packs = $po->fetchAll();
 
-  $packTable = table_open() . "<tr><th>Package</th><th class='right'>Units</th><th class='right'>Nominal g</th><th class='right'>Total g</th></tr>";
+  // Map RV weights by normalized package name
+  $rvWeights = [
+    'quart'  => (float)($B['quart_est_g']  ?? 0),
+    'pint'   => (float)($B['pint_est_g']   ?? 0),
+    'single' => (float)($B['single_est_g'] ?? 0),
+  ];
+  $norm = function(string $name): string {
+    $n = strtolower($name);
+    if (strpos($n, 'quart')  !== false) return 'quart';
+    if (strpos($n, 'pint')   !== false) return 'pint';
+    if (strpos($n, 'single') !== false) return 'single';
+    return ''; // unknown -> 0
+  };
+
+  $packTable = table_open() . "<tr>
+      <th>Package</th>
+      <th class='right'>Units</th>
+      <th class='right'>RV g/unit</th>
+      <th class='right'>Total g</th>
+    </tr>";
+
   $packTotal = 0.0;
+  $missing = false;
   foreach ($packs as $p) {
-    $u = (int)$p['unit_count'];
-    $g = (float)$p['nominal_g_per_unit'];
-    $tg = $u * $g; $packTotal += $tg;
+    $key = $norm((string)$p['name']);
+    $g   = $key !== '' ? ($rvWeights[$key] ?? 0.0) : 0.0;
+    if ($g <= 0) $missing = true;
+
+    $u  = (int)$p['unit_count'];
+    $tg = $u * $g; 
+    $packTotal += $tg;
+
     $packTable .= "<tr>
       <td>".h($p['name'])."</td>
       <td class='right'>".$u."</td>
@@ -133,8 +160,12 @@ $router->get('/batches/view', function () {
       <td class='right'>".number_format($tg,2)."</td>
     </tr>";
   }
-  $packTable .= "<tr><td colspan='3' class='right'><strong>Packed total (nominal)</strong></td>
+  $packTable .= "<tr><td colspan='3' class='right'><strong>Packed total (RV)</strong></td>
                    <td class='right'><strong>".number_format($packTotal,2)."</strong></td></tr></table>";
+
+  if ($missing) {
+    $packTable .= "<p class='small muted'>Some sizes have an RV weight of 0 — update this recipe version to populate totals.</p>";
+  }
 
   $hdr = "<h1>Batch #".(int)$B['id']." — ".h($B['recipe_name'])." v".(int)$B['version_no']."</h1>
     <p>Date: ".h(date('Y-m-d H:i', strtotime($B['batch_date'])))."</p>
@@ -527,7 +558,8 @@ $router->get('/batches/edit', function () {
   if ($id <= 0) { http_response_code(400); exit('Bad batch id'); }
 
   $h = $pdo->prepare("
-    SELECT b.*, rv.default_yield_g, r.name AS recipe_name, rv.version_no
+    SELECT b.*, rv.default_yield_g, r.name AS recipe_name, rv.version_no,
+           rv.quart_est_g, rv.pint_est_g, rv.single_est_g
     FROM batches b
     JOIN recipe_versions rv ON rv.id = b.recipe_version_id
     JOIN recipes r          ON r.id = rv.recipe_id
@@ -556,6 +588,21 @@ $router->get('/batches/edit', function () {
   $rit->execute([$id, $id]); $rows = $rit->fetchAll();
 
   $groups = [];
+
+  // RV-specific weights (for hints)
+  $rvWeights = [
+    'quart'  => (float)($B['quart_est_g']  ?? 0),
+    'pint'   => (float)($B['pint_est_g']   ?? 0),
+    'single' => (float)($B['single_est_g'] ?? 0),
+  ];
+  $norm = function(string $name): string {
+    $n = strtolower($name);
+    if (strpos($n, 'quart')  !== false) return 'quart';
+    if (strpos($n, 'pint')   !== false) return 'pint';
+    if (strpos($n, 'single') !== false) return 'single';
+    return '';
+  };
+
   foreach ($rows as $r) $groups[(int)$r['cg']][] = $r;
 
   // For alternate groups, pick the resolved RI if present; else primary; else first
@@ -620,12 +667,18 @@ $router->get('/batches/edit', function () {
 
     <h3>Packouts</h3>
     <div class='row'>";
-  foreach ($pt as $p) {
+    foreach ($pt as $p) {
     $val = isset($packMap[(int)$p['id']]) ? (int)$packMap[(int)$p['id']] : 0;
+    $key = $norm((string)$p['name']);
+    $rv  = $key !== '' ? ($rvWeights[$key] ?? 0.0) : 0.0;
+    $hint = $rv > 0
+      ? "RV ".number_format($rv,2)." g"
+      : "<span class='muted'>RV 0 g — set in recipe version</span>";
+  
     $hdr .= "<div class='col'><label>".h($p['name'])." units
                <input type='number' min='0' step='1' name='pack[".(int)$p['id']."]' value='{$val}'>
-             </label><div class='small muted'>Nominal ".number_format((float)$p['nominal_g_per_unit'],2)." g</div></div>";
-  }
+             </label><div class='small muted'>{$hint}</div></div>";
+    }
   $hdr .= "</div>
 
     <h2>Ingredients checklist (adjust if needed)</h2>";
