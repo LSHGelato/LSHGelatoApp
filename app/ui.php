@@ -42,19 +42,33 @@ function require_admin(): void {
 }
 
 /**
- * Open a table, optionally with a header row.
+ * Open a table, supporting old and new call styles.
  *
- * Usage:
- *   // legacy style: build your own <tr><th>...</th></tr>
- *   $html = table_open();           // returns "<table>"
- *
- *   // helper style: pass headers and we’ll emit the header row
- *   $html = table_open(['A','B']);  // returns "<table><tr><th>A</th><th>B</th></tr>"
- *
- * @param array<int,string>               $headers  Optional list of column headers
- * @param array<string,string>|string     $attrs    Optional attributes map or raw string
+ * Supported signatures:
+ *  - table_open()                                  → "<table>"
+ *  - table_open("class='x' id='y'")                → "<table class='x' id='y'>"
+ *  - table_open(['H1','H2'])                       → "<table><tr><th>H1</th><th>H2</th></tr>"
+ *  - table_open(['H1','H2'], "class='x'")          → "<table class='x'><tr>…</tr>"
+ *  - table_open(['H1','H2'], ['class'=>'x','id'=>'y'])
  */
-function table_open(array $headers = [], $attrs = ''): string {
+function table_open($headersOrAttrs = null, $maybeAttrs = null): string {
+  $headers = [];
+  $attrs   = '';
+
+  // Decide what we were passed
+  if (is_array($headersOrAttrs)) {
+    // New style: headers first, optional attrs second
+    $headers = $headersOrAttrs;
+    $attrs   = $maybeAttrs ?? '';
+  } elseif (is_string($headersOrAttrs) && $headersOrAttrs !== '') {
+    // Old style: only an attributes string
+    $attrs = $headersOrAttrs;
+  } elseif (is_array($maybeAttrs)) {
+    // Rare case: attrs array given as second arg while first was null/blank
+    $attrs = $maybeAttrs;
+  }
+
+  // Build attribute string
   $attrStr = '';
   if (is_array($attrs)) {
     foreach ($attrs as $k => $v) {
@@ -67,15 +81,16 @@ function table_open(array $headers = [], $attrs = ''): string {
     $attrStr = $attrs;
   }
 
-  if (empty($headers)) {
-    return "<table{$attrStr}>";
+  // Optional header row
+  $th = '';
+  if (!empty($headers)) {
+    foreach ($headers as $hcell) {
+      $th .= '<th>' . h((string)$hcell) . '</th>';
+    }
+    return "<table{$attrStr}><tr>{$th}</tr>";
   }
 
-  $th = '';
-  foreach ($headers as $hcell) {
-    $th .= '<th>' . h((string)$hcell) . '</th>';
-  }
-  return "<table{$attrStr}><tr>{$th}</tr>";
+  return "<table{$attrStr}>";
 }
 
 function table_row(array $cells): string {
