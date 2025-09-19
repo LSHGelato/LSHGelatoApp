@@ -352,7 +352,7 @@ $router->get('/batches/new', function() {
 });
 
 $router->post('/batches/save', function() {
-  require_login(); post_only(); csrf_verify(); global $pdo;
+  require_login(); post_only(); global $pdo;
 
   $rv_id = (int)($_POST['rv_id'] ?? 0);
   if ($rv_id <= 0) { http_response_code(400); render('Batch error','<p class="err">Bad recipe version id.</p>'); return; }
