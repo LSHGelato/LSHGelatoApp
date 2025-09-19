@@ -493,7 +493,7 @@ $router->post('/batches/save', function() {
           INSERT INTO inventory_txns
             (ingredient_id, txn_ts, txn_date, txn_type, qty, unit_kind, unit_cost_bwp,
              source_table, source_id, note, created_by)
-          VALUES (?, NOW(), ?, 'usage', ?, ?, 0, 'batches', ?, ?, ?)
+          VALUES (?, NOW(), ?, 'consumption', ?, ?, 0, 'batches', ?, ?, ?)
         ");
         $note = "Batch #$batch_id usage";
         $insTxn->execute([$iid, $txn_date, $delta, $uMap[$iid] ?? 'g', $batch_id, $note, (int)($_SESSION['user']['id'] ?? 0)]);
@@ -921,7 +921,7 @@ $router->post('/batches/update', function () {
           INSERT INTO inventory_txns
             (ingredient_id, txn_ts, txn_date, txn_type, qty, unit_kind, unit_cost_bwp,
              source_table, source_id, note, created_by)
-          VALUES (?, NOW(), ?, 'usage', ?, ?, 0, 'batches', ?, ?, ?)
+          VALUES (?, NOW(), ?, 'consumption', ?, ?, 0, 'batches', ?, ?, ?)
         ");
         $note = "Batch #$id usage (edit)";
         $insTxn->execute([$iid, $txn_date, $delta, $uMap[$iid] ?? 'g', $id, $note, (int)($_SESSION['user']['id'] ?? 0)]);
