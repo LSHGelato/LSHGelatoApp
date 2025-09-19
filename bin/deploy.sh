@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Resolve repo root relative to this script file
-SCRIPT_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# cd to repo root (this script lives in bin/)
+REPO_DIR="$(cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/.."
+cd "$REPO_DIR"
+
+git fetch --all --prune
+git reset --hard origin/main
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 if [[ -z "$ROOT" ]]; then
   echo "Error: could not locate repo root. Make sure this script lives inside the repo." >&2
@@ -25,3 +30,4 @@ ts="$(TZ=UTC date +'%Y-%m-%dT%H:%M:%SZ')"   # UTC timestamp; stable across serve
 printf "%s\n" "$rev $ts" > "$ROOT/var/REVISION"
 
 echo "Deploy complete ✔  (repo: $ROOT)"
+
