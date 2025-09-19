@@ -1,14 +1,7 @@
 parameters:
   level: 1
-  bootstrapFiles:
-    - phpstan-bootstrap.php
-
-  # Only analyze our application code
   paths:
     - app
     - routes
-
-  # Optional: if you really want to skip CLI helpers
-  # (this key is widely supported across versions)
-  excludes_analyse:
-    - app/bin/*
+  bootstrapFiles:
+    - phpstan-bootstrap.php
