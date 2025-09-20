@@ -29,6 +29,7 @@ $router->get('/batches', function () {
 
   $rows = $pdo->query("
     SELECT b.id, b.batch_date, b.churn_start_dt, b.target_mix_g, b.actual_mix_g, b.cogs_bwp,
+           b.notes,
            r.name AS recipe_name, rv.version_no
     FROM batches b
     JOIN recipe_versions rv ON rv.id = b.recipe_version_id
@@ -46,16 +47,21 @@ $router->get('/batches', function () {
   }
   $nav = $navLinks ? "<p class='pager'>".implode(' | ', $navLinks)."</p>" : '';
 
-  $tbl = table_open()
-    . "<tr><th>Date</th><th>Recipe</th><th>v</th><th class='right'>Target (g)</th><th class='right'>Actual (g)</th><th class='right'>COGS (BWP)</th><th>Actions</th></tr>";
-  foreach ($rows as $r) {
+$tbl = table_open()
+  . "<tr><th>Date</th><th>Recipe</th><th>v</th><th class='right'>Target (g)</th><th class='right'>Actual (g)</th><th class='right'>COGS (BWP)</th><th>Notes</th><th>Actions</th></tr>";
+
+foreach ($rows as $r) {
+  $note = trim((string)($r['notes'] ?? ''));
+  $noteShort = $note === '' ? '' : h(strlen($note) > 60 ? substr($note,0,60).'…' : $note);
+
     $tbl .= "<tr>
       <td>".h(date('Y-m-d H:i', strtotime($r['batch_date'])))."</td>
       <td>".h($r['recipe_name'])."</td>
       <td class='center'>".(int)$r['version_no']."</td>
       <td class='right'>".number_format((float)$r['target_mix_g'],3)."</td>
       <td class='right'>".number_format((float)$r['actual_mix_g'],3)."</td>
-      <td class='right'>".number_format((float)$r['cogs_bwp'] ?? 0,2)."</td>
+      <td class='right'>".number_format((float)($r['cogs_bwp'] ?? 0),2)."</td>
+      <td>".($noteShort !== '' ? $noteShort : "<span class='muted'>—</span>")."</td>
       <td><a href='".url_for("/batches/view?id=".(int)$r['id'])."'>View</a> &nbsp;|&nbsp;
           <a href='".url_for("/batches/edit?id=".(int)$r['id'])."'>Edit</a></td>
     </tr>";
@@ -72,7 +78,8 @@ $router->get('/batches/view', function () {
   if ($id <= 0) { http_response_code(400); exit('Bad id'); }
 
   $h = $pdo->prepare("
-    SELECT b.*, r.name AS recipe_name, rv.version_no, rv.quart_est_g, rv.pint_est_g, rv.single_est_g
+    SELECT b.*, r.name AS recipe_name, rv.version_no, rv.quart_est_g, rv.pint_est_g, rv.single_est_g,
+           rv.notes AS rv_notes
     FROM batches b
     JOIN recipe_versions rv ON rv.id = b.recipe_version_id
     JOIN recipes r          ON r.id = rv.recipe_id
@@ -175,6 +182,29 @@ $router->get('/batches/view', function () {
     <p>COGS (stored): ".number_format((float)($B['cogs_bwp'] ?? 0),2)." BWP</p>
     <p><a href='".url_for("/batches/edit?id=".(int)$B['id'])."'>Edit batch</a></p>";
 
+    // Delete Batch button //
+    $tok = csrf_token();
+    
+    if (role_is('admin')) {
+      $hdr .= "
+        <form method='post' action='".url_for("/batches/delete")."' 
+              onsubmit='return confirm(\"Delete this batch and undo its inventory deductions? This cannot be undone.\")'
+              style='margin: .5rem 0'>
+          ".csrf_field($tok)."
+          <input type='hidden' name='id' value='".(int)$B['id']."'>
+          <button class='danger'>Delete batch</button>
+        </form>";
+    }
+
+  $noteBlocks = '';
+  if (trim((string)$B['rv_notes']) !== '') {
+    $noteBlocks .= "<p class='small'><strong>Version notes:</strong> ".h($B['rv_notes'])."</p>";
+  }
+  if (trim((string)$B['notes']) !== '') {
+    $noteBlocks .= "<p><strong>Batch notes:</strong> ".h($B['notes'])."</p>";
+  }
+  $hdr .= $noteBlocks;
+
   render('View Batch', $hdr."<h2>Ingredients</h2>".$tbl."<h2>Packouts</h2>".$packTable);
 });
 
@@ -243,6 +273,12 @@ $router->get('/batches/new', function() {
         <div class='col'><label>Bowl weight (g) <input name='bowl' type='number' step='0.001'></label></div>
         <div class='col'><label>Bowl+mix (g) <input name='bowlmix' type='number' step='0.001'></label></div>
         <div class='col small muted' id='netWeightHint'></div>
+      </div>
+
+      <div class='row'>
+        <div class='col' style='flex:1 1 100%'><label>Notes
+          <textarea name='notes' rows='2' placeholder='Anything special about this batch or this run?'></textarea>
+        </label></div>
       </div>
 
       <h2>Ingredients checklist</h2>";
@@ -406,11 +442,13 @@ $router->post('/batches/save', function() {
 
     $insB = $pdo->prepare("
       INSERT INTO batches
-        (recipe_version_id, batch_date, target_mix_g, bowl_weight_g, bowl_plus_mix_g, actual_mix_g, deduct_inventory, created_by)
-      VALUES (?,?,?,?,?,?,?,?)
+        (recipe_version_id, batch_date, target_mix_g, bowl_weight_g, bowl_plus_mix_g, actual_mix_g,
+         deduct_inventory, notes, created_by)
+      VALUES (?,?,?,?,?,?,?, ?, ?)
     ");
     $insB->execute([
-      $rv_id, $batch_date, $target, $bowl, $bowlmix, $actual, $deduct, (int)($_SESSION['user']['id'] ?? 0)
+      $rv_id, $batch_date, $target, $bowl, $bowlmix, $actual,
+      $deduct, ($notes !== '' ? $notes : null), (int)($_SESSION['user']['id'] ?? 0)
     ]);
     $batch_id = (int)$pdo->lastInsertId();
 
@@ -649,6 +687,12 @@ $router->get('/batches/edit', function () {
     </div>
 
     <div class='row'>
+      <div class='col' style='flex:1 1 100%'><label>Notes
+        <textarea name='notes' rows='2' placeholder='Notes for this batch'>".h((string)($B['notes'] ?? ''))."</textarea>
+      </label></div>
+    </div>
+
+    <div class='row'>
       <div class='col'><label>Empty-bowl weight (g) <input name='bowl' type='number' step='0.001' value='".number_format((float)$B['bowl_weight_g'],3,'.','')."'></label></div>
       <div class='col'><label>Bowl+mix (g) <input name='bowlmix' type='number' step='0.001' value='".number_format((float)$B['bowl_plus_mix_g'],3,'.','')."'></label></div>
       <div class='col small muted'>Net mix ≈ ".number_format((float)$B['actual_mix_g'],3)." g</div>
@@ -679,6 +723,22 @@ $router->get('/batches/edit', function () {
                <input type='number' min='0' step='1' name='pack[".(int)$p['id']."]' value='{$val}'>
              </label><div class='small muted'>{$hint}</div></div>";
     }
+
+    // Delete Batch button //
+    $tok = csrf_token();
+    
+    if (role_is('admin')) {
+      $hdr .= "
+        <form method='post' action='".url_for("/batches/delete")."' 
+              onsubmit='return confirm(\"Delete this batch and undo its inventory deductions? This cannot be undone.\")'
+              style='margin: .5rem 0'>
+          ".csrf_field($tok)."
+          <input type='hidden' name='id' value='".(int)$B['id']."'>
+          <button class='danger'>Delete batch</button>
+        </form>";
+    }
+
+
   $hdr .= "</div>
 
     <h2>Ingredients checklist (adjust if needed)</h2>";
@@ -826,6 +886,7 @@ $router->post('/batches/update', function () {
   $bowlmix    = (float)($_POST['bowlmix'] ?? 0);
   $actual     = $bowlmix - $bowl;
   $deduct     = (int)($_POST['deduct'] ?? 1) ? 1 : 0;
+  $notes = trim((string)($_POST['notes'] ?? ''));
 
   $churn_start = $_POST['churn_start'] ?? null;
   $bowl_after  = ($_POST['bowl_after'] ?? '') !== '' ? (float)$_POST['bowl_after'] : null;
@@ -848,11 +909,12 @@ $router->post('/batches/update', function () {
     $pdo->prepare("
       UPDATE batches
       SET batch_date=?, target_mix_g=?, bowl_weight_g=?, bowl_plus_mix_g=?, actual_mix_g=?,
-          deduct_inventory=?, churn_start_dt=?, bowl_with_residue_g=?, residue_g=?
+          deduct_inventory=?, churn_start_dt=?, bowl_with_residue_g=?, residue_g=?, notes=?
       WHERE id=?
     ")->execute([
       $batch_date, $target, $bowl, $bowlmix, $actual,
-      $deduct, ($churn_start ?: null), $bowl_after, $residue, $id
+      $deduct, ($churn_start ?: null), $bowl_after, $residue,
+      ($notes !== '' ? $notes : null), $id
     ]);
 
     // Build recipe items
@@ -1000,5 +1062,41 @@ $router->post('/batches/update', function () {
   } catch (Throwable $e) {
     $pdo->rollBack();
     render('Batch update error', "<p class='err'>".h($e->getMessage())."</p><p><a href='".url_for("/batches/edit?id=".$id)."'>Back</a></p>");
+  }
+});
+
+$router->post('/batches/delete', function () {
+  require_admin();
+  post_only(); // includes CSRF verify
+  global $pdo;
+
+  $id = (int)($_POST['id'] ?? 0);
+  if ($id <= 0) { http_response_code(400); render('Delete batch','<p class="err">Bad id.</p>'); return; }
+
+  try {
+    $pdo->beginTransaction();
+
+    // Remove any inventory usage rows that this batch contributed.
+    // We key strictly by the provenance fields, regardless of txn_type.
+    $pdo->prepare("DELETE FROM inventory_txns WHERE source_table='batches' AND source_id=?")
+        ->execute([$id]);
+
+    // Child tables first (in case FKs exist)
+    $pdo->prepare("DELETE FROM batch_packouts WHERE batch_id=?")->execute([$id]);
+    $pdo->prepare("DELETE FROM batch_ingredient_resolutions WHERE batch_id=?")->execute([$id]);
+
+    // Finally, delete the batch header
+    $pdo->prepare("DELETE FROM batches WHERE id=?")->execute([$id]);
+
+    $pdo->commit();
+
+    render('Batch deleted', 
+      "<p class='ok'>Batch #".(int)$id." deleted and its inventory deductions removed.</p>
+       <p><a href='".url_for("/batches")."'>Back to Batches</a></p>");
+
+  } catch (Throwable $e) {
+    $pdo->rollBack();
+    render('Delete batch', "<p class='err'>".h($e->getMessage())."</p>
+      <p><a href='".url_for("/batches/view?id=".$id)."'>Back</a></p>");
   }
 });

@@ -26,8 +26,33 @@ $router->get('/admin/tools', function () {
   <h2>PO normalization</h2>
   <p><a class='btn' href='".url_for("/admin/tools/normalize-po")."'>Scan for lines needing normalization</a></p>
   <p><a class='btn' href='".url_for("/admin/tools/fix-and-recalc")."'>Fix &amp; Recalc (all)</a></p>";
+  
+  $tok = csrf_token();
+  $body .= "
+    <h2>Units</h2>
+    <form method='post' action='".url_for("/admin/tools/base-units-to-grams")."'
+          onsubmit='return confirm(\"Set unit_kind = g for base ingredients (IDs 5,6,7,8,9,10,13,15)?\")'>
+      ".csrf_field($tok)."
+      <button>Set base ingredients to grams</button>
+    </form>
+  ";
+
 
   render('Admin Tools', $body);
+});
+
+$router->post('/admin/tools/base-units-to-grams', function () {
+  require_admin(); post_only(); global $pdo;
+
+  $ids = [5, 6, 7, 8, 9, 10, 13, 15];
+  $place = implode(',', array_fill(0, count($ids), '?'));
+
+  // Flip their unit_kind to 'g' (1 ml ≈ 1 g accepted by the business rule)
+  $st = $pdo->prepare("UPDATE ingredients SET unit_kind='g' WHERE id IN ($place)");
+  $st->execute($ids);
+
+  render('Units updated', "<p class='ok'>Set unit_kind='g' for ".count($ids)." base ingredients.</p>
+    <p><a href='".url_for("/admin/tools")."'>Back</a></p>");
 });
 
 $router->post('/admin/tools/wac-recalc', function () {
@@ -91,9 +116,7 @@ $router->get('/admin/tools/normalize-po', function() {
   }
   $tbl .= "</table>";
 
-  $form = "<form method='post' action='".url_for("/admin/tools/normalize-po/apply")."'>"
-        . csrf_field($tok)
-        . "<button>Apply normalization to ".count($rows)." line(s)</button></form>";
+    $form = "<form method='post' action='".url_for("/admin/tools/normalize-po/apply")."'>".csrf_field($tok)."<button>Apply normalization to ".count($rows)." line(s)</button></form>";
 
   render('Normalize PO', "<h1>Normalize PO Unit Costs</h1><p>This will convert line totals into per-unit costs and fix WAC.</p>{$tbl}{$form}<p><a href='".url_for("/ingredients")."'>Back</a></p>");
 });
@@ -132,9 +155,7 @@ $router->get('/admin/tools/fix-and-recalc', function() {
   $tok   = csrf_token();
   $count = count($rows);
 
-  $btn = "<form method='post' action='".url_for("/admin/tools/normalize-po/apply".($iid ? ("?id=".$iid) : ""))."'>"
-       . csrf_field($tok)
-       . "<button>Fix ".($iid ? ("ingredient ".(int)$iid) : "all ingredients")." ({$count} line(s))</button></form>";
+  $btn = "<form method='post' action='".url_for("/admin/tools/normalize-po/apply".($iid?("?id=".$iid):""))."'>".csrf_field($tok)."<button>Fix ".($iid?"ingredient ".$iid:"all ingredients")." ({$count} line(s))</button></form>";
 
   render('Fix & Recalc', "<h1>Fix & Recalc</h1><p>Detected ".(int)$count." line(s) needing normalization.</p>{$btn}");
 });
