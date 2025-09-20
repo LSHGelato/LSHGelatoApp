@@ -182,6 +182,20 @@ $router->get('/batches/view', function () {
     <p>COGS (stored): ".number_format((float)($B['cogs_bwp'] ?? 0),2)." BWP</p>
     <p><a href='".url_for("/batches/edit?id=".(int)$B['id'])."'>Edit batch</a></p>";
 
+    // Delete Batch button //
+    $tok = csrf_token();
+    
+    if (role_is('admin')) {
+      $hdr .= "
+        <form method='post' action='".url_for("/batches/delete")."' 
+              onsubmit='return confirm(\"Delete this batch and undo its inventory deductions? This cannot be undone.\")'
+              style='margin: .5rem 0'>
+          ".csrf_field($tok)."
+          <input type='hidden' name='id' value='".(int)$B['id']."'>
+          <button class='danger'>Delete batch</button>
+        </form>";
+    }
+
   $noteBlocks = '';
   if (trim((string)$B['rv_notes']) !== '') {
     $noteBlocks .= "<p class='small'><strong>Version notes:</strong> ".h($B['rv_notes'])."</p>";
@@ -709,6 +723,22 @@ $router->get('/batches/edit', function () {
                <input type='number' min='0' step='1' name='pack[".(int)$p['id']."]' value='{$val}'>
              </label><div class='small muted'>{$hint}</div></div>";
     }
+
+    // Delete Batch button //
+    $tok = csrf_token();
+    
+    if (role_is('admin')) {
+      $hdr .= "
+        <form method='post' action='".url_for("/batches/delete")."' 
+              onsubmit='return confirm(\"Delete this batch and undo its inventory deductions? This cannot be undone.\")'
+              style='margin: .5rem 0'>
+          ".csrf_field($tok)."
+          <input type='hidden' name='id' value='".(int)$B['id']."'>
+          <button class='danger'>Delete batch</button>
+        </form>";
+    }
+
+
   $hdr .= "</div>
 
     <h2>Ingredients checklist (adjust if needed)</h2>";
@@ -1032,5 +1062,41 @@ $router->post('/batches/update', function () {
   } catch (Throwable $e) {
     $pdo->rollBack();
     render('Batch update error', "<p class='err'>".h($e->getMessage())."</p><p><a href='".url_for("/batches/edit?id=".$id)."'>Back</a></p>");
+  }
+});
+
+$router->post('/batches/delete', function () {
+  require_admin();
+  post_only(); // includes CSRF verify
+  global $pdo;
+
+  $id = (int)($_POST['id'] ?? 0);
+  if ($id <= 0) { http_response_code(400); render('Delete batch','<p class="err">Bad id.</p>'); return; }
+
+  try {
+    $pdo->beginTransaction();
+
+    // Remove any inventory usage rows that this batch contributed.
+    // We key strictly by the provenance fields, regardless of txn_type.
+    $pdo->prepare("DELETE FROM inventory_txns WHERE source_table='batches' AND source_id=?")
+        ->execute([$id]);
+
+    // Child tables first (in case FKs exist)
+    $pdo->prepare("DELETE FROM batch_packouts WHERE batch_id=?")->execute([$id]);
+    $pdo->prepare("DELETE FROM batch_ingredient_resolutions WHERE batch_id=?")->execute([$id]);
+
+    // Finally, delete the batch header
+    $pdo->prepare("DELETE FROM batches WHERE id=?")->execute([$id]);
+
+    $pdo->commit();
+
+    render('Batch deleted', 
+      "<p class='ok'>Batch #".(int)$id." deleted and its inventory deductions removed.</p>
+       <p><a href='".url_for("/batches")."'>Back to Batches</a></p>");
+
+  } catch (Throwable $e) {
+    $pdo->rollBack();
+    render('Delete batch', "<p class='err'>".h($e->getMessage())."</p>
+      <p><a href='".url_for("/batches/view?id=".$id)."'>Back</a></p>");
   }
 });
