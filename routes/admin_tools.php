@@ -26,8 +26,33 @@ $router->get('/admin/tools', function () {
   <h2>PO normalization</h2>
   <p><a class='btn' href='".url_for("/admin/tools/normalize-po")."'>Scan for lines needing normalization</a></p>
   <p><a class='btn' href='".url_for("/admin/tools/fix-and-recalc")."'>Fix &amp; Recalc (all)</a></p>";
+  
+  $tok = csrf_token();
+  $body .= "
+    <h2>Units</h2>
+    <form method='post' action='".url_for("/admin/tools/base-units-to-grams")."'
+          onsubmit='return confirm(\"Set unit_kind = g for base ingredients (IDs 5,6,7,8,9,10,13,15)?\")'>
+      ".csrf_field($tok)."
+      <button>Set base ingredients to grams</button>
+    </form>
+  ";
+
 
   render('Admin Tools', $body);
+});
+
+$router->post('/admin/tools/base-units-to-grams', function () {
+  require_admin(); post_only(); csrf_verify(); global $pdo;
+
+  $ids = [5, 6, 7, 8, 9, 10, 13, 15];
+  $place = implode(',', array_fill(0, count($ids), '?'));
+
+  // Flip their unit_kind to 'g' (1 ml ≈ 1 g accepted by the business rule)
+  $st = $pdo->prepare("UPDATE ingredients SET unit_kind='g' WHERE id IN ($place)");
+  $st->execute($ids);
+
+  render('Units updated', "<p class='ok'>Set unit_kind='g' for ".count($ids)." base ingredients.</p>
+    <p><a href='".url_for("/admin/tools")."'>Back</a></p>");
 });
 
 $router->post('/admin/tools/wac-recalc', function () {

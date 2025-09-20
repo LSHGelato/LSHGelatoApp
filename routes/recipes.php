@@ -155,7 +155,22 @@ $router->get('/recipes/newversion', function () {
   $v->execute([$recipe_id]); $nextv = (int)$v->fetch()['nextv'];
   $tok = csrf_token();
 
+  $base_btn = '';
+  if (role_is('admin')) {
+    $tokBase = csrf_token();
+    $base_btn = "
+      <form method='post' action='".url_for("/recipes/add-base")."'
+            style='display:inline-block;margin-right:.5rem'
+            onsubmit='return confirm(\"Add gelato base to this version? Missing items will be inserted and existing ones updated to grams.\")'>
+        ".csrf_field($tokBase)."
+        <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
+        <button class='btn'>Add gelato base</button>
+      </form>";
+  }
+
+
   $body = "<h1>New Version</h1>
+
   <form method='post' action='".url_for("/recipes/newversion/save")."'>
     ".csrf_field($tok)."
     <input type='hidden' name='recipe_id' value='".(int)$recipe_id."'>
@@ -281,7 +296,7 @@ $router->get('/recipes/view', function () {
       </p>
       <p class='small' style='margin:.25rem 0 0'><strong>Estimated total cost:</strong> ".number_format($total_cost,2)." BWP</p>
     </div>
-    <div><a class='btn' href='".url_for("/recipes/items?rv_id=".$rv_id)."'>Edit this version</a></div>
+    <div>{$base_btn}<a class='btn' href='".url_for("/recipes/items?rv_id=".$rv_id)."'>Edit this version</a></div>
   </div>";
 
   // Ingredients table (includes per-line extended cost and the per-ingredient step note)
@@ -384,6 +399,19 @@ $router->get('/recipes/items', function() {
 
   $batch_btn = "<a class='btn' href='".url_for("/batches/new?rv_id=".(int)$rv_id)."'>Start batch</a>";
 
+  $base_btn = '';
+  if (role_is('admin')) {
+    $tokBase = csrf_token();
+    $base_btn = "
+      <form method='post' action='".url_for("/recipes/add-base")."'
+            style='display:inline-block;margin-right:.5rem'
+            onsubmit='return confirm(\"Add gelato base to this version? Missing items will be inserted and existing ones updated to grams.\")'>
+        ".csrf_field($tokBase)."
+        <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
+        <button class='btn'>Add gelato base</button>
+      </form>";
+  }
+
   $tokPkg  = csrf_token();
   $pkgForm = "";
   if (role_is('admin')) {
@@ -416,7 +444,7 @@ $router->get('/recipes/items', function() {
               </p>
               ".($pkgForm)."
             </div>
-            <div>{$batch_btn}</div>
+            <div>{$base_btn}{$batch_btn}</div>
           </div>";
 
   $ing = $pdo->query("SELECT id,name,unit_kind FROM ingredients WHERE is_active=1 ORDER BY name")->fetchAll();
@@ -835,4 +863,56 @@ $router->post('/recipes/steps/clone', function() {
     header('Location: ' . url_for('/recipes/items?rv_id='.$rv_id)); exit;
 
   } catch (Throwable $e) { $pdo->rollBack(); render('Clone steps', "<p class='err'>".h($e->getMessage())."</p>"); }
+});
+
+/** Gelato base (grams) keyed by ingredient_id */
+const GELATO_BASE_G = [
+  5  => 500.0,
+  6  => 250.0,
+  9  => 150.0,
+  10 => 30.0,
+  7  => 22.0,
+  8  => 10.0,
+  13 => 2.5,
+  15 => 15.0,
+];
+
+$router->post('/recipes/add-base', function () {
+  require_admin();
+  post_only(); // includes csrf_verify()
+  global $pdo;
+
+  $rv_id = (int)($_POST['rv_id'] ?? 0);
+  if ($rv_id <= 0) { render('Add base','<p class="err">Bad recipe version id.</p>'); return; }
+
+  // current max sort order
+  $st = $pdo->prepare("SELECT COALESCE(MAX(sort_order),0) FROM recipe_items WHERE recipe_version_id=?");
+  $st->execute([$rv_id]); $sort = (int)$st->fetchColumn();
+  $sortStep = 10;
+
+  // existing items in choice_group=0, keyed by ingredient_id
+  $ex = $pdo->prepare("SELECT id, ingredient_id FROM recipe_items WHERE recipe_version_id=? AND choice_group=0");
+  $ex->execute([$rv_id]); $map = [];
+  foreach ($ex as $r) { $map[(int)$r['ingredient_id']] = (int)$r['id']; }
+
+  $ins = $pdo->prepare("
+    INSERT INTO recipe_items (recipe_version_id, ingredient_id, choice_group, qty, unit_kind, is_primary, sort_order)
+    VALUES (?, ?, 0, ?, 'g', 1, ?)
+  ");
+  $upd = $pdo->prepare("UPDATE recipe_items SET qty=?, unit_kind='g' WHERE id=?");
+
+  $added = 0; $updated = 0;
+  foreach (GELATO_BASE_G as $iid => $qty) {
+    if (isset($map[$iid])) {
+      $upd->execute([$qty, $map[$iid]]);
+      $updated++;
+    } else {
+      $sort += $sortStep;
+      $ins->execute([$rv_id, (int)$iid, $qty, $sort]);
+      $added++;
+    }
+  }
+
+  render('Base added', "<p class='ok'>Added {$added} and updated {$updated} base items.</p>
+    <p><a href='".url_for("/recipes")."'>Back to Recipes</a></p>");
 });
