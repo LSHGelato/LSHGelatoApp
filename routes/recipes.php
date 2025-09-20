@@ -377,7 +377,7 @@ $router->get('/recipes/items', function() {
 
   $tbl = table_open() . "<tr>
       <th>Group</th><th>Ingredient</th><th>Qty</th><th>Unit</th>
-      <th>Primary</th><th>Cost (BWP)</th><th>Step notes</th><th>Move</th><th>Actions</th>
+      <th>Primary</th><th>Cost (BWP)</th><th>Step notes</th><th>Actions</th>
     </tr>";
     
   $total_cost = 0.0;
@@ -389,17 +389,6 @@ $router->get('/recipes/items', function() {
     if ((int)$r['choice_group'] === 0 || (int)$r['is_primary'] === 1) {
       $total_cost += $cost;
     }
-
-    // move up/down controls (stay within the same choice_group)
-    $moveForm = "
-      <form method='post' action='".url_for("/recipes/items/move")."' style='display:inline'>
-        ".csrf_field($tok)."
-        <input type='hidden' name='id' value='".(int)$r['id']."'>
-        <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
-        <button class='link' name='dir' value='up' title='Move up'>&uarr;</button>
-        <button class='link' name='dir' value='down' title='Move down'>&darr;</button>
-      </form>";
-
     $tbl .= "<tr>
       <td>".(int)$r['choice_group']."</td>
       <td>".h($r['name'])."</td>
@@ -408,7 +397,6 @@ $router->get('/recipes/items', function() {
       <td>".((int)$r['is_primary'] ? '✔' : '')."</td>
       <td class='right' title='@ ".number_format($per,4)." per ".h($r['unit_kind'])."'>".number_format($cost,2)."</td>
       <td>".h((string)$r['step_notes'])."</td>
-      <td class='center' style='white-space:nowrap;width:6rem'>{$moveForm}</td>
       <td>
         <a href='".url_for("/recipes/items/edit?id=".(int)$r['id'])."'>Edit</a>
         <form method='post' action='".url_for("/recipes/items/delete")."' style='display:inline' onsubmit='return confirm(\"Remove this item?\")'>
@@ -436,17 +424,6 @@ $router->get('/recipes/items', function() {
         <button class='btn'>Add gelato base</button>
       </form>";
   }
-
-  // Make all base (cg 0 or NULL) primary button
-  $tokPrim = csrf_token();
-  $makePrimaryBtn = "
-    <form method='post' action='".url_for("/recipes/items/primaryize")."'
-          style='display:inline-block;margin-left:.5rem'
-          onsubmit='return confirm(\"Mark all base (group 0/blank) ingredients as Primary? This affects only this version.\")'>
-      ".csrf_field($tokPrim)."
-      <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
-      <button class='btn'>Make base ingredients primary</button>
-    </form>";
 
   $tokPkg  = csrf_token();
   $pkgForm = "";
@@ -502,10 +479,10 @@ $router->get('/recipes/items', function() {
               </p>
               ".($pkgForm.$renameForm)."
             </div>
-            <div>{$base_btn}{$makePrimaryBtn}{$batch_btn}</div>
+            <div>{$base_btn}{$batch_btn}</div>
           </div>";
 
-  // ---------- Add ingredient (reordered; unit locked to g; Primary defaults to Yes) ----------
+  // ---------- Add ingredient (reordered; unit locked to g; default primary=yes) ----------
   $ing = $pdo->query("SELECT id,name,unit_kind FROM ingredients WHERE is_active=1 ORDER BY name")->fetchAll();
   $opt = ""; foreach ($ing as $i) { $opt .= "<option value='".(int)$i['id']."'>".h($i['name'])." (".h($i['unit_kind']).")</option>"; }
   $tok = csrf_token();
@@ -527,6 +504,33 @@ $router->get('/recipes/items', function() {
       <div class='col' style='flex:2'><label>Step notes <input name='step_notes'></label></div>
       <button>Add item</button>
     </form>";
+
+  // ---------- Clone ingredients from another version ----------
+  $rv_opts_ing = $pdo->query("
+    SELECT rv.id AS rv_id, r.name, rv.version_no, rv.version_label
+    FROM recipe_versions rv
+    JOIN recipes r ON r.id = rv.recipe_id
+    WHERE rv.id <> ".(int)$rv_id."
+    ORDER BY r.name, rv.version_no DESC
+    LIMIT 200
+  ")->fetchAll();
+  $clone_ing_form = "";
+  if ($rv_opts_ing) {
+    $o = "";
+    foreach ($rv_opts_ing as $vrow) {
+      $label = ($vrow['version_label'] ?? '') !== '' ? ' — '.h($vrow['version_label']) : '';
+      $o .= "<option value='".(int)$vrow['rv_id']."'>".h($vrow['name'])." v".(int)$vrow['version_no'].$label."</option>";
+    }
+    $tok_clone_ing = csrf_token();
+    $clone_ing_form = "<h4>Clone ingredients from another version</h4>
+      <form method='post' action='".url_for("/recipes/items/clone-ingredients")."'
+            class='row' onsubmit='return confirm(\"Append all ingredients from the selected version?\")'>
+        ".csrf_field($tok_clone_ing)."
+        <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
+        <div class='col' style='flex:2'><label>Source version <select name='from_rv_id'>{$o}</select></label></div>
+        <button>Clone ingredients</button>
+      </form>";
+  }
 
   // ---------- Steps (table view with no header row) ----------
   $steps = $pdo->prepare("SELECT * FROM recipe_steps WHERE recipe_version_id=? ORDER BY step_no");
@@ -614,7 +618,7 @@ $router->get('/recipes/items', function() {
   }
 
   // No bottom "Create batch…" link anymore
-  render('Recipe Items', $hdr.$tbl.$form.$steps_html.$steps_form);
+  render('Recipe Items', $hdr.$tbl.$form.$clone_ing_form.$steps_html.$steps_form);
 });
 
 /* ---------- Item CRUD ---------- */
@@ -700,8 +704,8 @@ $router->post('/recipes/items/add', function() {
     $ingUnit = $ci->fetchColumn();
     if ($ingUnit === false) { render('Add item error','<p class="err">Ingredient not found or inactive.</p>'); return; }
 
-    $st = $pdo->prepare('SELECT COALESCE(MAX(sort_order),0)+1 FROM recipe_items WHERE recipe_version_id=? AND COALESCE(choice_group,0)=COALESCE(?,0)');
-    $st->execute([$rv_id, $choiceGroup]);
+    $st = $pdo->prepare('SELECT COALESCE(MAX(sort_order),0)+1 FROM recipe_items WHERE recipe_version_id=?');
+    $st->execute([$rv_id]);
     $sort = (int)($st->fetchColumn() ?: 1);
 
     $ins = $pdo->prepare('
@@ -720,63 +724,58 @@ $router->post('/recipes/items/add', function() {
   }
 });
 
-/* ---------- Items: move up/down within a choice group ---------- */
-$router->post('/recipes/items/move', function() {
-  require_admin();
-  post_only(); global $pdo;
-
-  $id   = (int)($_POST['id'] ?? 0);
-  $rv_id= (int)($_POST['rv_id'] ?? 0);
-  $dir  = ($_POST['dir'] ?? '') === 'up' ? 'up' : 'down';
-  if ($id<=0 || $rv_id<=0) { render('Move item','<p class="err">Bad request.</p>'); return; }
-
-  try {
-    $pdo->beginTransaction();
-
-    $cur = $pdo->prepare('SELECT id, recipe_version_id, COALESCE(choice_group,0) AS cg, sort_order FROM recipe_items WHERE id=? FOR UPDATE');
-    $cur->execute([$id]); $row = $cur->fetch();
-    if (!$row) { throw new RuntimeException('Item not found'); }
-
-    $cg = (int)$row['cg']; $so = (int)$row['sort_order'];
-
-    if ($dir === 'up') {
-      $nb = $pdo->prepare('SELECT id, sort_order FROM recipe_items WHERE recipe_version_id=? AND COALESCE(choice_group,0)=? AND sort_order < ? ORDER BY sort_order DESC, id DESC LIMIT 1 FOR UPDATE');
-      $nb->execute([$rv_id, $cg, $so]);
-    } else {
-      $nb = $pdo->prepare('SELECT id, sort_order FROM recipe_items WHERE recipe_version_id=? AND COALESCE(choice_group,0)=? AND sort_order > ? ORDER BY sort_order ASC, id ASC LIMIT 1 FOR UPDATE');
-      $nb->execute([$rv_id, $cg, $so]);
-    }
-    $neighbor = $nb->fetch();
-
-    if ($neighbor) {
-      $nid = (int)$neighbor['id']; $nso = (int)$neighbor['sort_order'];
-      $tmp = -1;
-      $pdo->prepare('UPDATE recipe_items SET sort_order=? WHERE id=?')->execute([$tmp, $id]);
-      $pdo->prepare('UPDATE recipe_items SET sort_order=? WHERE id=?')->execute([$so,  $nid]);
-      $pdo->prepare('UPDATE recipe_items SET sort_order=? WHERE id=?')->execute([$nso, $id]);
-    }
-    $pdo->commit();
-
-    header('Location: ' . url_for('/recipes/items?rv_id='.$rv_id)); exit;
-
-  } catch (Throwable $e) {
-    $pdo->rollBack();
-    render('Move item', "<p class='err'>".h($e->getMessage())."</p>");
-  }
-});
-
-/* ---------- Items: make all base (choice_group 0 or NULL) primary ---------- */
-$router->post('/recipes/items/primaryize', function() {
+/* ---------- Clone ingredients ---------- */
+$router->post('/recipes/items/clone-ingredients', function() {
   require_admin();
   post_only(); global $pdo;
 
   $rv_id = (int)($_POST['rv_id'] ?? 0);
-  if ($rv_id<=0) { render('Primaryize','<p class="err">Bad version id.</p>'); return; }
+  $from  = (int)($_POST['from_rv_id'] ?? 0);
+  if ($rv_id<=0 || $from<=0 || $rv_id===$from) { render('Clone ingredients','<p class="err">Bad source/target.</p>'); return; }
 
-  $pdo->prepare("UPDATE recipe_items SET is_primary=1 WHERE recipe_version_id=? AND (choice_group IS NULL OR choice_group=0)")
-      ->execute([$rv_id]);
+  try {
+    $pdo->beginTransaction();
 
-  header('Location: ' . url_for('/recipes/items?rv_id='.$rv_id));
+    // Source rows
+    $st = $pdo->prepare('
+      SELECT choice_group, ingredient_id, qty, unit_kind, is_primary, step_notes
+      FROM recipe_items
+      WHERE recipe_version_id = ?
+      ORDER BY choice_group, sort_order, id
+    ');
+    $st->execute([$from]);
+    $src = $st->fetchAll();
+
+    // Start sort order from current max
+    $nx = $pdo->prepare('SELECT COALESCE(MAX(sort_order),0) FROM recipe_items WHERE recipe_version_id=?');
+    $nx->execute([$rv_id]);
+    $sort = (int)$nx->fetchColumn();
+    $sortStep = 10;
+
+    $ins = $pdo->prepare('
+      INSERT INTO recipe_items
+        (recipe_version_id, choice_group, ingredient_id, qty, unit_kind, is_primary, step_notes, sort_order)
+      VALUES (?,?,?,?,?,?,?,?)
+    ');
+
+    foreach ($src as $row) {
+      $sort += $sortStep;
+      $cg = (int)($row['choice_group'] ?? 0);
+      $iid = (int)$row['ingredient_id'];
+      $qty = (float)$row['qty'];
+      $unit = ($row['unit_kind'] === 'ml') ? 'ml' : 'g';
+      $prim = (int)$row['is_primary'] ? 1 : 0;
+      $notes = trim((string)($row['step_notes'] ?? ''));
+      $ins->execute([$rv_id, $cg, $iid, $qty, $unit, $prim, $notes !== '' ? $notes : null, $sort]);
+    }
+
+    $pdo->commit();
+    header('Location: ' . url_for('/recipes/items?rv_id='.$rv_id)); exit;
+
+  } catch (Throwable $e) {
+    $pdo->rollBack();
+    render('Clone ingredients', "<p class='err'>".h($e->getMessage())."</p>");
+  }
 });
 
 /* ---------- Steps ---------- */
@@ -1009,13 +1008,13 @@ $router->post('/recipes/add-base', function () {
   $rv_id = (int)($_POST['rv_id'] ?? 0);
   if ($rv_id <= 0) { render('Add base','<p class="err">Bad recipe version id.</p>'); return; }
 
-  // current max sort order within cg 0
-  $st = $pdo->prepare("SELECT COALESCE(MAX(sort_order),0) FROM recipe_items WHERE recipe_version_id=? AND COALESCE(choice_group,0)=0");
+  // current max sort order
+  $st = $pdo->prepare("SELECT COALESCE(MAX(sort_order),0) FROM recipe_items WHERE recipe_version_id=?");
   $st->execute([$rv_id]); $sort = (int)$st->fetchColumn();
   $sortStep = 10;
 
   // existing items in choice_group=0, keyed by ingredient_id
-  $ex = $pdo->prepare("SELECT id, ingredient_id FROM recipe_items WHERE recipe_version_id=? AND COALESCE(choice_group,0)=0");
+  $ex = $pdo->prepare("SELECT id, ingredient_id FROM recipe_items WHERE recipe_version_id=? AND choice_group=0");
   $ex->execute([$rv_id]); $map = [];
   foreach ($ex as $r) { $map[(int)$r['ingredient_id']] = (int)$r['id']; }
 
