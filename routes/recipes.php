@@ -17,7 +17,7 @@ $router->get('/recipes', function () {
 
   // Preload all versions so we can render links without N+1 queries
   $allv = $pdo->query("
-    SELECT id, recipe_id, version_no
+    SELECT id, recipe_id, version_no, version_label
     FROM recipe_versions
     ORDER BY recipe_id, version_no DESC
   ")->fetchAll();
@@ -31,7 +31,9 @@ $router->get('/recipes', function () {
     if (!empty($byRecipe[$rid])) {
       $parts = [];
       foreach ($byRecipe[$rid] as $v) {
-        $parts[] = "<a href='".url_for("/recipes/view?rv_id=".(int)$v['id'])."'>v".(int)$v['version_no']."</a>";
+        $txt = "v".(int)$v['version_no'];
+        if (($v['version_label'] ?? '') !== '') { $txt .= " — ".h($v['version_label']); }
+        $parts[] = "<a href='".url_for("/recipes/view?rv_id=".(int)$v['id'])."'>".$txt."</a>";
       }
       $links = implode(' &nbsp; ', $parts);
     }
@@ -67,6 +69,10 @@ $router->get('/recipes', function () {
     
         <label>Default yield (g)
           <input type='number' step='0.001' name='default_yield_g' value='1100'>
+        </label>
+
+        <label>Version label (optional)
+          <input name='version_label' maxlength='100' placeholder='e.g., stick'>
         </label>
     
         <label>PAC
@@ -120,21 +126,22 @@ $router->post('/recipes/create', function () {
 
     $st = $pdo->prepare("
       INSERT INTO recipe_versions
-        (recipe_id, version_no, default_yield_g, pac, pod,
+        (recipe_id, version_no, version_label, default_yield_g, pac, pod,
          quart_est_g, pint_est_g, single_est_g,
          alt_resolution, created_by)
-      VALUES (?,?,?,?,?,?,?,?,?,?)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?)
     ");
     $st->execute([
       $rid,
       1,
-      (float)($_POST['yield'] ?? 1100),
+      (($_POST['version_label'] ?? '') !== '' ? trim((string)$_POST['version_label']) : null),
+      (float)($_POST['default_yield_g'] ?? 1100),
       $_POST['pac']  !== '' ? (float)$_POST['pac']  : null,
       $_POST['pod']  !== '' ? (float)$_POST['pod']  : null,
       $_POST['quart_est_g']  !== '' ? (float)$_POST['quart_est_g']  : null,
       $_POST['pint_est_g']   !== '' ? (float)$_POST['pint_est_g']   : null,
       $_POST['single_est_g'] !== '' ? (float)$_POST['single_est_g'] : null,
-      $_POST['alt'] ?? 'primary',
+      $_POST['alt_resolution'] ?? 'primary',
       (int)($_SESSION['user']['id'] ?? 0),
     ]);
     $rvid = (int)$pdo->lastInsertId();
@@ -155,20 +162,6 @@ $router->get('/recipes/newversion', function () {
   $v->execute([$recipe_id]); $nextv = (int)$v->fetch()['nextv'];
   $tok = csrf_token();
 
-  $base_btn = '';
-  if (role_is('admin')) {
-    $tokBase = csrf_token();
-    $base_btn = "
-      <form method='post' action='".url_for("/recipes/add-base")."'
-            style='display:inline-block;margin-right:.5rem'
-            onsubmit='return confirm(\"Add gelato base to this version? Missing items will be inserted and existing ones updated to grams.\")'>
-        ".csrf_field($tokBase)."
-        <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
-        <button class='btn'>Add gelato base</button>
-      </form>";
-  }
-
-
   $body = "<h1>New Version</h1>
 
   <form method='post' action='".url_for("/recipes/newversion/save")."'>
@@ -176,6 +169,9 @@ $router->get('/recipes/newversion', function () {
     <input type='hidden' name='recipe_id' value='".(int)$recipe_id."'>
     <label>Version # <input name='version_no' type='number' value='".(int)$nextv."'></label>
     <label>Default yield (g) <input name='yield' type='number' step='0.001' value='1100'></label>
+    <label>Version label (optional)
+      <input name='version_label' maxlength='100' placeholder='e.g., ground'>
+    </label>
     <label>PAC <input name='pac' type='number' step='0.001'></label>
     <label>POD <input name='pod' type='number' step='0.001'></label>
     <label>Alt resolution <select name='alt'><option value='primary'>primary</option><option value='heaviest'>heaviest</option></select></label>
@@ -195,14 +191,15 @@ $router->post('/recipes/newversion/save', function () {
 
   $st = $pdo->prepare("
     INSERT INTO recipe_versions
-      (recipe_id, version_no, default_yield_g, pac, pod,
+      (recipe_id, version_no, version_label, default_yield_g, pac, pod,
        quart_est_g, pint_est_g, single_est_g,
        alt_resolution, created_by)
-    VALUES (?,?,?,?,?,?,?,?,?,?)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?)
   ");
   $st->execute([
     (int)$_POST['recipe_id'],
     (int)$_POST['version_no'],
+    (($_POST['version_label'] ?? '') !== '' ? trim((string)$_POST['version_label']) : null),
     (float)$_POST['yield'],
     $_POST['pac']  !== '' ? (float)$_POST['pac']  : null,
     $_POST['pod']  !== '' ? (float)$_POST['pod']  : null,
@@ -233,6 +230,26 @@ $router->post('/recipes/version/weights', function () {
     $_POST['single_est_g'] !== '' ? (float)$_POST['single_est_g'] : null,
     $rv_id
   ]);
+
+  header('Location: ' . url_for('/recipes/items?rv_id='.$rv_id));
+});
+
+/* ---------- Rename version label ---------- */
+$router->post('/recipes/version/rename', function () {
+  require_admin();
+  post_only(); global $pdo;
+
+  $rv_id = (int)($_POST['rv_id'] ?? 0);
+  if ($rv_id <= 0) { http_response_code(400); exit('Bad version id'); }
+
+  $label = trim((string)($_POST['version_label'] ?? ''));
+  if ($label === '') { $label = null; }
+  if ($label !== null && mb_strlen($label) > 100) {
+    $label = mb_substr($label, 0, 100);
+  }
+
+  $st = $pdo->prepare("UPDATE recipe_versions SET version_label=? WHERE id=?");
+  $st->execute([$label, $rv_id]);
 
   header('Location: ' . url_for('/recipes/items?rv_id='.$rv_id));
 });
@@ -288,7 +305,9 @@ $router->get('/recipes/view', function () {
   // Header
   $head = "<div class='row' style='align-items:center;justify-content:space-between'>
     <div>
-      <h1 style='margin:0'>".h($v['recipe_name'])." — v".(int)$v['version_no']."</h1>
+      <h1 style='margin:0'>".h($v['recipe_name'])." — v".(int)$v['version_no']
+        .( ($v['version_label']??'')!=='' ? " — ".h($v['version_label']) : "" )
+      ."</h1>
       <p class='small' style='margin:.25rem 0 0'>
         Default yield: ".number_format((float)$v['default_yield_g'],3)." g
         • Alt: ".h($v['alt_resolution'])."
@@ -296,7 +315,7 @@ $router->get('/recipes/view', function () {
       </p>
       <p class='small' style='margin:.25rem 0 0'><strong>Estimated total cost:</strong> ".number_format($total_cost,2)." BWP</p>
     </div>
-    <div>{$base_btn}<a class='btn' href='".url_for("/recipes/items?rv_id=".$rv_id)."'>Edit this version</a></div>
+    <div><a class='btn' href='".url_for("/recipes/items?rv_id=".$rv_id)."'>Edit this version</a></div>
   </div>";
 
   // Ingredients table (includes per-line extended cost and the per-ingredient step note)
@@ -322,7 +341,7 @@ $router->get('/recipes/view', function () {
               <td class='right'><strong>".number_format($total_cost,2)."</strong></td>
               <td></td></tr></table>";
 
-  // Steps block
+  // Steps block (view page keeps simple list)
   $steps_html = "<h2>Steps</h2>";
   if ($S) {
     $steps_html .= "<ol>";
@@ -356,46 +375,52 @@ $router->get('/recipes/items', function() {
                           ORDER BY ri.choice_group, ri.sort_order, i.name");
   $items->execute([$rv_id]); $rows = $items->fetchAll();
 
-    $tbl = table_open() . "<tr>
+  $tbl = table_open() . "<tr>
       <th>Group</th><th>Ingredient</th><th>Qty</th><th>Unit</th>
-      <th>Primary</th><th>Cost (BWP)</th><th>Step notes</th><th>Actions</th>
+      <th>Primary</th><th>Cost (BWP)</th><th>Step notes</th><th>Move</th><th>Actions</th>
     </tr>";
     
-    $total_cost = 0.0;
-    
-    foreach ($rows as $r) {
-      $tok  = csrf_token();
-      $qty  = (float)$r['qty'];              // recipe quantity in canonical unit
-      $per  = (float)$r['wac'];              // BWP per canonical unit
-      $cost = $qty * $per;                   // item cost for this row
-    
-      // Include in total if not an alternate OR it's the primary choice
-      if ((int)$r['choice_group'] === 0 || (int)$r['is_primary'] === 1) {
-        $total_cost += $cost;
-      }
-    
-      $tbl .= "<tr>
-        <td>".(int)$r['choice_group']."</td>
-        <td>".h($r['name'])."</td>
-        <td>".number_format($qty,3)."</td>
-        <td>".h($r['unit_kind'])."</td>
-        <td>".((int)$r['is_primary'] ? '✔' : '')."</td>
-        <td class='right' title='@ ".number_format($per,4)." per ".h($r['unit_kind'])."'>"
-            .number_format($cost,2).
-        "</td>
-        <td>".h((string)$r['step_notes'])."</td>
-        <td>
-          <a href='".url_for("/recipes/items/edit?id=".(int)$r['id'])."'>Edit</a>
-          <form method='post' action='".url_for("/recipes/items/delete")."' style='display:inline' onsubmit='return confirm(\"Remove this item?\")'>
-            ".csrf_field($tok)."
-            <input type='hidden' name='id' value='".(int)$r['id']."'>
-            <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
-            <button class='link danger'>Remove</button>
-          </form>
-        </td>
-      </tr>";
+  $total_cost = 0.0;
+  foreach ($rows as $r) {
+    $tok  = csrf_token();
+    $qty  = (float)$r['qty'];
+    $per  = (float)$r['wac'];
+    $cost = $qty * $per;
+    if ((int)$r['choice_group'] === 0 || (int)$r['is_primary'] === 1) {
+      $total_cost += $cost;
     }
-    $tbl .= "</table>";
+
+    // move up/down controls (stay within the same choice_group)
+    $moveForm = "
+      <form method='post' action='".url_for("/recipes/items/move")."' style='display:inline'>
+        ".csrf_field($tok)."
+        <input type='hidden' name='id' value='".(int)$r['id']."'>
+        <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
+        <button class='link' name='dir' value='up' title='Move up'>&uarr;</button>
+        <button class='link' name='dir' value='down' title='Move down'>&darr;</button>
+      </form>";
+
+    $tbl .= "<tr>
+      <td>".(int)$r['choice_group']."</td>
+      <td>".h($r['name'])."</td>
+      <td>".number_format($qty,3)."</td>
+      <td>".h($r['unit_kind'])."</td>
+      <td>".((int)$r['is_primary'] ? '✔' : '')."</td>
+      <td class='right' title='@ ".number_format($per,4)." per ".h($r['unit_kind'])."'>".number_format($cost,2)."</td>
+      <td>".h((string)$r['step_notes'])."</td>
+      <td class='center' style='white-space:nowrap;width:6rem'>{$moveForm}</td>
+      <td>
+        <a href='".url_for("/recipes/items/edit?id=".(int)$r['id'])."'>Edit</a>
+        <form method='post' action='".url_for("/recipes/items/delete")."' style='display:inline' onsubmit='return confirm(\"Remove this item?\")'>
+          ".csrf_field($tok)."
+          <input type='hidden' name='id' value='".(int)$r['id']."'>
+          <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
+          <button class='link danger'>Remove</button>
+        </form>
+      </td>
+    </tr>";
+  }
+  $tbl .= "</table>";
 
   $batch_btn = "<a class='btn' href='".url_for("/batches/new?rv_id=".(int)$rv_id)."'>Start batch</a>";
 
@@ -411,6 +436,17 @@ $router->get('/recipes/items', function() {
         <button class='btn'>Add gelato base</button>
       </form>";
   }
+
+  // Make all base (cg 0 or NULL) primary button
+  $tokPrim = csrf_token();
+  $makePrimaryBtn = "
+    <form method='post' action='".url_for("/recipes/items/primaryize")."'
+          style='display:inline-block;margin-left:.5rem'
+          onsubmit='return confirm(\"Mark all base (group 0/blank) ingredients as Primary? This affects only this version.\")'>
+      ".csrf_field($tokPrim)."
+      <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
+      <button class='btn'>Make base ingredients primary</button>
+    </form>";
 
   $tokPkg  = csrf_token();
   $pkgForm = "";
@@ -429,9 +465,31 @@ $router->get('/recipes/items', function() {
       </form>";
   }
 
+  // Inline rename label form
+  $tokRename = csrf_token();
+  $renameForm = "";
+  if (role_is('admin')) {
+    $renameForm = "
+      <form method='post' action='".url_for("/recipes/version/rename")."'
+            class='row' style='gap:.75rem;align-items:end;margin-top:.5rem'>
+        ".csrf_field($tokRename)."
+        <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
+        <div class='col' style='flex:2'>
+          <label>Version label
+            <input name='version_label' maxlength='100'
+                   value='".h((string)$version['version_label'])."'
+                   placeholder='e.g., stick / ground'>
+          </label>
+        </div>
+        <div class='col'><button>Save label</button></div>
+      </form>";
+  }
+
   $hdr = "<div class='row' style='align-items:center;justify-content:space-between'>
             <div>
-              <h1 style='margin:0'>".h($version['recipe_name'])." — v".(int)$version['version_no']."</h1>
+              <h1 style='margin:0'>".h($version['recipe_name'])." — v".(int)$version['version_no']
+                .( ($version['version_label']??'')!=='' ? " — ".h($version['version_label']) : "" )
+              ."</h1>
               <p class='small' style='margin-top:.25rem'>
                 Default yield: ".number_format((float)$version['default_yield_g'],3)." g
                 • Alt: ".h($version['alt_resolution'])."
@@ -442,70 +500,97 @@ $router->get('/recipes/items', function() {
                 pint ".h((string)$version['pint_est_g'])." •
                 single ".h((string)$version['single_est_g'])."
               </p>
-              ".($pkgForm)."
+              ".($pkgForm.$renameForm)."
             </div>
-            <div>{$base_btn}{$batch_btn}</div>
+            <div>{$base_btn}{$makePrimaryBtn}{$batch_btn}</div>
           </div>";
 
+  // ---------- Add ingredient (reordered; unit locked to g; Primary defaults to Yes) ----------
   $ing = $pdo->query("SELECT id,name,unit_kind FROM ingredients WHERE is_active=1 ORDER BY name")->fetchAll();
   $opt = ""; foreach ($ing as $i) { $opt .= "<option value='".(int)$i['id']."'>".h($i['name'])." (".h($i['unit_kind']).")</option>"; }
   $tok = csrf_token();
   $form = "<h3>Add ingredient to version</h3>
-    <form method='post' action='".url_for("/recipes/items/add")."' class='row'>
+    <form method='post' action='".url_for("/recipes/items/add")."' class='row' style='align-items:flex-end; gap:.75rem'>
       ".csrf_field($tok)."
       <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
-      <div class='col'><label>Ingredient <select name='ingredient_id'>{$opt}</select></label></div>
+      <div class='col' style='max-width:9rem'><label>Choice group <input name='choice_group' type='number' value='0'></label></div>
+      <div class='col' style='flex:2'><label>Ingredient <select name='ingredient_id'>{$opt}</select></label></div>
       <div class='col'><label>Qty <input type='number' name='qty' step='0.001' required></label></div>
-      <div class='col'><label>Unit
-        <select name='unit_kind'><option>g</option><option>ml</option></select></label></div>
-      <div class='col'><label>Choice group <input name='choice_group' type='number' value='0'></label></div>
-      <div class='col'><label>Primary?
-        <select name='is_primary'><option value='0'>No</option><option value='1'>Yes</option></select></label></div>
-      <div class='col'><label>Step notes <input name='step_notes'></label></div>
+      <div class='col' style='max-width:7rem'>
+        <label>Unit
+          <input value='g' disabled>
+          <input type='hidden' name='unit_kind' value='g'>
+        </label>
+      </div>
+      <div class='col' style='max-width:9rem'><label>Primary?
+        <select name='is_primary'><option value='1' selected>Yes</option><option value='0'>No</option></select></label></div>
+      <div class='col' style='flex:2'><label>Step notes <input name='step_notes'></label></div>
       <button>Add item</button>
     </form>";
 
-  // Steps (list + add + library + clone) — identical to your previous logic:
+  // ---------- Steps (table view with no header row) ----------
   $steps = $pdo->prepare("SELECT * FROM recipe_steps WHERE recipe_version_id=? ORDER BY step_no");
   $steps->execute([$rv_id]);
   $tokSteps = csrf_token();
-  $steps_html = "<h3>Steps</h3><ol>";
-  foreach ($steps as $s) {
-    $steps_html .= "<li>"
-      . h($s['instruction'])
-      . " <form method='post' action='".url_for("/recipes/steps/move")."' style='display:inline'>
-           ".csrf_field($tokSteps)."
-           <input type='hidden' name='id' value='".(int)$s['id']."'>
-           <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
-           <button class='link' name='dir' value='up'>&uarr;</button>
-           <button class='link' name='dir' value='down'>&darr;</button>
-          </form>
-          <a href='".url_for("/recipes/steps/edit?id=".(int)$s['id'])."'>Edit</a>
-          <form method='post' action='".url_for("/recipes/steps/delete")."' style='display:inline' onsubmit='return confirm(\"Delete this step?\")'>
-            ".csrf_field($tokSteps)."
-            <input type='hidden' name='id' value='".(int)$s['id']."'>
-            <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
-            <button class='link danger'>Delete</button>
-          </form>"
-      . "</li>";
-  }
-  $steps_html .= "</ol>";
 
+  $steps_html = "<h3>Steps</h3>";
+  $rowsSteps = $steps->fetchAll();
+  if ($rowsSteps) {
+    $steps_html .= table_open();
+    foreach ($rowsSteps as $s) {
+      $moveForm = "
+        <form method='post' action='".url_for("/recipes/steps/move")."' style='display:inline'>
+          ".csrf_field($tokSteps)."
+          <input type='hidden' name='id' value='".(int)$s['id']."'>
+          <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
+          <button class='link' name='dir' value='up'>&uarr;</button>
+          <button class='link' name='dir' value='down'>&darr;</button>
+        </form>";
+
+      $actions = "
+        <a href='".url_for("/recipes/steps/edit?id=".(int)$s['id'])."'>Edit</a>
+        <form method='post' action='".url_for("/recipes/steps/delete")."' style='display:inline' onsubmit='return confirm(\"Delete this step?\")'>
+          ".csrf_field($tokSteps)."
+          <input type='hidden' name='id' value='".(int)$s['id']."'>
+          <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
+          <button class='link danger'>Delete</button>
+        </form>";
+
+      $steps_html .= "<tr>
+        <td class='center' style='width:5rem'>".(int)$s['step_no']."</td>
+        <td class='left'>".h($s['instruction'])."</td>
+        <td class='center' style='white-space:nowrap;width:6rem'>{$moveForm}</td>
+        <td class='center' style='white-space:nowrap;width:10rem'>{$actions}</td>
+      </tr>";
+    }
+    $steps_html .= "</table>";
+  } else {
+    $steps_html .= "<p class='muted'>No steps yet.</p>";
+  }
+
+  // ---------- Add step (matches table: step #, instruction, then controls) ----------
   $ns = $pdo->prepare("SELECT COALESCE(MAX(step_no),0)+1 FROM recipe_steps WHERE recipe_version_id=?");
   $ns->execute([$rv_id]);
   $next_no = (int)$ns->fetchColumn();
 
   $tok_step = csrf_token();
   $steps_form = "<h4>Add step</h4>
-    <form method='post' action='".url_for("/recipes/steps/add")."' class='row'>
+    <form method='post' action='".url_for("/recipes/steps/add")."'>
       ".csrf_field($tok_step)."
       <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
-      <div class='col'><label>Step # <input name='step_no' type='number' min='1' value='".(int)$next_no."'></label></div>
-      <div class='col' style='flex:2'><label>Instruction <input name='instruction' required placeholder='e.g., Heat milk to 45°C; dissolve sugars; chill…'></label></div>
-      <div class='col'><label><input type='checkbox' name='save_to_library' value='1'> Save to library</label></div>
-      <button>Add step</button>
+      ".table_open()."
+      <tr>
+        <td class='center' style='width:5rem'><input name='step_no' type='number' min='1' value='".(int)$next_no."' style='width:4.5rem'></td>
+        <td style='width:100%'><textarea name='instruction' rows='3' required placeholder='e.g., Heat milk to 45°C; dissolve sugars; chill…' style='width:100%'></textarea></td>
+        <td class='center' style='white-space:nowrap;width:12rem'>
+          <label><input type='checkbox' name='save_to_library' value='1'> Save to library</label>
+          <button style='margin-left:.5rem'>Add step</button>
+        </td>
+      </tr>
+      </table>
     </form>";
 
+  // ---------- Insert from library (matches add-step layout) ----------
   $lib = $pdo->query("SELECT id,instruction FROM step_library ORDER BY usage_count DESC, id DESC LIMIT 200")->fetchAll();
   if ($lib) {
     $opts = "";
@@ -515,41 +600,21 @@ $router->get('/recipes/items', function() {
     }
     $tok_lib = csrf_token();
     $steps_form .= "<h4>Insert from library</h4>
-      <form method='post' action='".url_for("/recipes/steps/add-from-library")."' class='row'>
+      <form method='post' action='".url_for("/recipes/steps/add-from-library")."'>
         ".csrf_field($tok_lib)."
         <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
-        <div class='col'><label>Step # <input name='step_no' type='number' min='1' value='".(int)$next_no."'></label></div>
-        <div class='col' style='flex:2'><label>Library <select name='library_id'>{$opts}</select></label></div>
-        <button>Add</button>
+        ".table_open()."
+        <tr>
+          <td class='center' style='width:5rem'><input name='step_no' type='number' min='1' value='".(int)$next_no."' style='width:4.5rem'></td>
+          <td style='width:100%'><select name='library_id' style='width:100%'>$opts</select></td>
+          <td class='center' style='white-space:nowrap;width:12rem'><button>Add</button></td>
+        </tr>
+        </table>
       </form>";
   }
 
-  $rv_opts = $pdo->query("
-    SELECT rv.id AS rv_id, r.name, rv.version_no
-    FROM recipe_versions rv
-    JOIN recipes r ON r.id = rv.recipe_id
-    WHERE rv.id <> ".(int)$rv_id."
-    ORDER BY r.name, rv.version_no DESC
-    LIMIT 100
-  ")->fetchAll();
-
-  if ($rv_opts) {
-    $o = "";
-    foreach ($rv_opts as $vrow) {
-      $o .= "<option value='".(int)$vrow['rv_id']."'>".h($vrow['name'])." v".(int)$vrow['version_no']."</option>";
-    }
-    $tok_clone = csrf_token();
-    $steps_form .= "<h4>Clone steps from another version</h4>
-      <form method='post' action='".url_for("/recipes/steps/clone")."' class='row' onsubmit='return confirm(\"Append all steps from the selected version?\")'>
-        ".csrf_field($tok_clone)."
-        <input type='hidden' name='rv_id' value='".(int)$rv_id."'>
-        <div class='col' style='flex:2'><label>Source version <select name='from_rv_id'>{$o}</select></label></div>
-        <button>Clone steps</button>
-      </form>";
-  }
-
-  $link_batch = "<p><a href='".url_for("/batches/new?rv_id=".(int)$rv_id)."'>Create batch from this version</a></p>";
-  render('Recipe Items', $hdr.$tbl.$form.$steps_html.$steps_form.$link_batch);
+  // No bottom "Create batch…" link anymore
+  render('Recipe Items', $hdr.$tbl.$form.$steps_html.$steps_form);
 });
 
 /* ---------- Item CRUD ---------- */
@@ -616,7 +681,7 @@ $router->post('/recipes/items/add', function() {
   $rv_id        = (int)($_POST['rv_id'] ?? 0);
   $ingredientId = (int)($_POST['ingredient_id'] ?? 0);
   $qty          = (float)($_POST['qty'] ?? 0);
-  $unit         = ($_POST['unit_kind'] ?? 'g') === 'ml' ? 'ml' : 'g';
+  $unit         = 'g'; // lock to grams
   $choiceGroup  = (int)($_POST['choice_group'] ?? 0);
   $isPrimary    = (int)($_POST['is_primary'] ?? 0) ? 1 : 0;
   $stepNotes    = trim($_POST['step_notes'] ?? '');
@@ -635,8 +700,8 @@ $router->post('/recipes/items/add', function() {
     $ingUnit = $ci->fetchColumn();
     if ($ingUnit === false) { render('Add item error','<p class="err">Ingredient not found or inactive.</p>'); return; }
 
-    $st = $pdo->prepare('SELECT COALESCE(MAX(sort_order),0)+1 FROM recipe_items WHERE recipe_version_id=?');
-    $st->execute([$rv_id]);
+    $st = $pdo->prepare('SELECT COALESCE(MAX(sort_order),0)+1 FROM recipe_items WHERE recipe_version_id=? AND COALESCE(choice_group,0)=COALESCE(?,0)');
+    $st->execute([$rv_id, $choiceGroup]);
     $sort = (int)($st->fetchColumn() ?: 1);
 
     $ins = $pdo->prepare('
@@ -653,6 +718,65 @@ $router->post('/recipes/items/add', function() {
   } catch (Throwable $e) {
     render('Add item error', "<p class='err'>".h($e->getMessage())."</p><p><a href='".url_for("/recipes/items?rv_id=".$rv_id)."'>Back</a></p>");
   }
+});
+
+/* ---------- Items: move up/down within a choice group ---------- */
+$router->post('/recipes/items/move', function() {
+  require_admin();
+  post_only(); global $pdo;
+
+  $id   = (int)($_POST['id'] ?? 0);
+  $rv_id= (int)($_POST['rv_id'] ?? 0);
+  $dir  = ($_POST['dir'] ?? '') === 'up' ? 'up' : 'down';
+  if ($id<=0 || $rv_id<=0) { render('Move item','<p class="err">Bad request.</p>'); return; }
+
+  try {
+    $pdo->beginTransaction();
+
+    $cur = $pdo->prepare('SELECT id, recipe_version_id, COALESCE(choice_group,0) AS cg, sort_order FROM recipe_items WHERE id=? FOR UPDATE');
+    $cur->execute([$id]); $row = $cur->fetch();
+    if (!$row) { throw new RuntimeException('Item not found'); }
+
+    $cg = (int)$row['cg']; $so = (int)$row['sort_order'];
+
+    if ($dir === 'up') {
+      $nb = $pdo->prepare('SELECT id, sort_order FROM recipe_items WHERE recipe_version_id=? AND COALESCE(choice_group,0)=? AND sort_order < ? ORDER BY sort_order DESC, id DESC LIMIT 1 FOR UPDATE');
+      $nb->execute([$rv_id, $cg, $so]);
+    } else {
+      $nb = $pdo->prepare('SELECT id, sort_order FROM recipe_items WHERE recipe_version_id=? AND COALESCE(choice_group,0)=? AND sort_order > ? ORDER BY sort_order ASC, id ASC LIMIT 1 FOR UPDATE');
+      $nb->execute([$rv_id, $cg, $so]);
+    }
+    $neighbor = $nb->fetch();
+
+    if ($neighbor) {
+      $nid = (int)$neighbor['id']; $nso = (int)$neighbor['sort_order'];
+      $tmp = -1;
+      $pdo->prepare('UPDATE recipe_items SET sort_order=? WHERE id=?')->execute([$tmp, $id]);
+      $pdo->prepare('UPDATE recipe_items SET sort_order=? WHERE id=?')->execute([$so,  $nid]);
+      $pdo->prepare('UPDATE recipe_items SET sort_order=? WHERE id=?')->execute([$nso, $id]);
+    }
+    $pdo->commit();
+
+    header('Location: ' . url_for('/recipes/items?rv_id='.$rv_id)); exit;
+
+  } catch (Throwable $e) {
+    $pdo->rollBack();
+    render('Move item', "<p class='err'>".h($e->getMessage())."</p>");
+  }
+});
+
+/* ---------- Items: make all base (choice_group 0 or NULL) primary ---------- */
+$router->post('/recipes/items/primaryize', function() {
+  require_admin();
+  post_only(); global $pdo;
+
+  $rv_id = (int)($_POST['rv_id'] ?? 0);
+  if ($rv_id<=0) { render('Primaryize','<p class="err">Bad version id.</p>'); return; }
+
+  $pdo->prepare("UPDATE recipe_items SET is_primary=1 WHERE recipe_version_id=? AND (choice_group IS NULL OR choice_group=0)")
+      ->execute([$rv_id]);
+
+  header('Location: ' . url_for('/recipes/items?rv_id='.$rv_id));
 });
 
 /* ---------- Steps ---------- */
@@ -885,13 +1009,13 @@ $router->post('/recipes/add-base', function () {
   $rv_id = (int)($_POST['rv_id'] ?? 0);
   if ($rv_id <= 0) { render('Add base','<p class="err">Bad recipe version id.</p>'); return; }
 
-  // current max sort order
-  $st = $pdo->prepare("SELECT COALESCE(MAX(sort_order),0) FROM recipe_items WHERE recipe_version_id=?");
+  // current max sort order within cg 0
+  $st = $pdo->prepare("SELECT COALESCE(MAX(sort_order),0) FROM recipe_items WHERE recipe_version_id=? AND COALESCE(choice_group,0)=0");
   $st->execute([$rv_id]); $sort = (int)$st->fetchColumn();
   $sortStep = 10;
 
   // existing items in choice_group=0, keyed by ingredient_id
-  $ex = $pdo->prepare("SELECT id, ingredient_id FROM recipe_items WHERE recipe_version_id=? AND choice_group=0");
+  $ex = $pdo->prepare("SELECT id, ingredient_id FROM recipe_items WHERE recipe_version_id=? AND COALESCE(choice_group,0)=0");
   $ex->execute([$rv_id]); $map = [];
   foreach ($ex as $r) { $map[(int)$r['ingredient_id']] = (int)$r['id']; }
 

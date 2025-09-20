@@ -1100,3 +1100,4 @@ $router->post('/batches/delete', function () {
       <p><a href='".url_for("/batches/view?id=".$id)."'>Back</a></p>");
   }
 });
+
