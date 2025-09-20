@@ -42,7 +42,7 @@ $router->get('/admin/tools', function () {
 });
 
 $router->post('/admin/tools/base-units-to-grams', function () {
-  require_admin(); post_only(); csrf_verify(); global $pdo;
+  require_admin(); post_only(); global $pdo;
 
   $ids = [5, 6, 7, 8, 9, 10, 13, 15];
   $place = implode(',', array_fill(0, count($ids), '?'));
@@ -116,9 +116,7 @@ $router->get('/admin/tools/normalize-po', function() {
   }
   $tbl .= "</table>";
 
-  $form = "<form method='post' action='".url_for("/admin/tools/normalize-po/apply")."'>"
-        . csrf_field($tok)
-        . "<button>Apply normalization to ".count($rows)." line(s)</button></form>";
+    $form = "<form method='post' action='".url_for("/admin/tools/normalize-po/apply")."'>".csrf_field($tok)."<button>Apply normalization to ".count($rows)." line(s)</button></form>";
 
   render('Normalize PO', "<h1>Normalize PO Unit Costs</h1><p>This will convert line totals into per-unit costs and fix WAC.</p>{$tbl}{$form}<p><a href='".url_for("/ingredients")."'>Back</a></p>");
 });
@@ -157,9 +155,7 @@ $router->get('/admin/tools/fix-and-recalc', function() {
   $tok   = csrf_token();
   $count = count($rows);
 
-  $btn = "<form method='post' action='".url_for("/admin/tools/normalize-po/apply".($iid ? ("?id=".$iid) : ""))."'>"
-       . csrf_field($tok)
-       . "<button>Fix ".($iid ? ("ingredient ".(int)$iid) : "all ingredients")." ({$count} line(s))</button></form>";
+  $btn = "<form method='post' action='".url_for("/admin/tools/normalize-po/apply".($iid?("?id=".$iid):""))."'>".csrf_field($tok)."<button>Fix ".($iid?"ingredient ".$iid:"all ingredients")." ({$count} line(s))</button></form>";
 
   render('Fix & Recalc', "<h1>Fix & Recalc</h1><p>Detected ".(int)$count." line(s) needing normalization.</p>{$btn}");
 });
